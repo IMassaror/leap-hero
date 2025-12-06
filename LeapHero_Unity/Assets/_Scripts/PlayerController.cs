@@ -4,8 +4,7 @@ public class PlayerController : MonoBehaviour
 {
     public enum Estado { Guerreiro, Sapo }
     public Estado estadoAtual;
-
-    // NOVO: Estados exclusivos para controlar o fluxo da língua
+    
     public enum EstadoLingua { Pronta, Atirando, PuxandoSapo, Retraindo }
     public EstadoLingua estadoLingua = EstadoLingua.Pronta;
 
@@ -31,13 +30,17 @@ public class PlayerController : MonoBehaviour
 
     [Header("Sapo - Língua (Grapple)")]
     public float alcanceLingua = 8f;
-    public float velocidadeLinguaIda = 20f;   // Velocidade da ponta da língua saindo
-    public float velocidadeLinguaVolta = 30f; // Velocidade da língua voltando (se errar)
-    public float velocidadePuxadaCorpo = 15f; // Velocidade do sapo indo até a parede
+    public float velocidadeLinguaIda = 25f;   
+    public float velocidadeLinguaVolta = 35f; 
+    public float velocidadePuxadaCorpo = 18f; 
+    public float delayEntreLinguadas = 0.5f; 
     public KeyCode teclaLingua = KeyCode.L; 
-    public LineRenderer lineRenderer; 
+    public LineRenderer lineRenderer;
+    
+    [Header("Ajustes Visuais")]
+    public Vector3 offsetBoca; 
 
-    // --- VARIÁVEIS INTERNAS ---
+    // VARIÁVEIS INTERNAS
     private Rigidbody2D rb;
     private SpriteRenderer sr;
     private BoxCollider2D colisor;
@@ -47,16 +50,14 @@ public class PlayerController : MonoBehaviour
     private bool jumpInputDown;
     private int pulosExtras;
     private bool viradoDireita = true;
-
-    // Timer da Parede
     private float wallStickTimer; 
+    private int ladoParede = 0;
     
-    // Variáveis da Lógica da Língua
-    private Vector2 destinoLingua;      // Onde a língua quer chegar (Parede ou Ar)
-    private Vector2 pontaLinguaAtual;   // Onde a ponta da língua está AGORA
-    private bool acertouParede;         // Flag para saber se puxamos o corpo ou retraímos a língua
+    private Vector2 destinoLingua;      
+    private Vector2 pontaLinguaAtual;   
+    private bool acertouParede;         
+    private float tempoParaProximaLingua;
 
-    // Sensores
     public bool isGrounded;
     public bool isTouchingWall;
 
@@ -66,41 +67,61 @@ public class PlayerController : MonoBehaviour
         sr = GetComponent<SpriteRenderer>();
         colisor = GetComponent<BoxCollider2D>();
         
-        if(lineRenderer != null) 
-        {
-            lineRenderer.enabled = false;
-            lineRenderer.positionCount = 2; // Garante que tem 2 pontos (Boca e Ponta)
-        }
-
+        if(lineRenderer != null) lineRenderer.enabled = false;
         TrocarEstado(Estado.Guerreiro);
     }
 
     void Update()
     {
-        // 1. Inputs
         xInput = Input.GetAxisRaw("Horizontal");
         yInput = Input.GetAxisRaw("Vertical");
-        if (Input.GetButtonDown("Jump")) jumpInputDown = true;
+
+        // Bloqueio de Pulo
+        if (estadoLingua == EstadoLingua.Pronta && Input.GetButtonDown("Jump")) 
+        {
+            jumpInputDown = true;
+        }
+
         if (Input.GetKeyDown(KeyCode.C)) TrocarEstado(estadoAtual == Estado.Guerreiro ? Estado.Sapo : Estado.Guerreiro);
 
-        // 2. DISPARO DA LÍNGUA (Inicia o processo)
-        if (estadoAtual == Estado.Sapo && estadoLingua == EstadoLingua.Pronta && Input.GetKeyDown(teclaLingua))
+        // --- DISPARO DA LÍNGUA ---
+        if (estadoAtual == Estado.Sapo && 
+            estadoLingua == EstadoLingua.Pronta && 
+            Input.GetKeyDown(teclaLingua) && 
+            Time.time > tempoParaProximaLingua) 
         {
+            // Lógica: Virar para as costas antes de atirar
+            if (xInput > 0 && !viradoDireita) Flip();
+            else if (xInput < 0 && viradoDireita) Flip();
+
             IniciarLingua();
         }
 
-        // 3. FLIP (Bloqueado se estiver usando a língua)
-        if (estadoLingua == EstadoLingua.Pronta && (!isTouchingWall || isGrounded))
+        // Flip Normal
+        if (estadoLingua == EstadoLingua.Pronta && !isTouchingWall)
         {
              if (xInput > 0 && !viradoDireita) Flip();
              else if (xInput < 0 && viradoDireita) Flip();
         }
+    }
 
-        // 4. ATUALIZAR VISUAL DA LÍNGUA
-        if (estadoLingua != EstadoLingua.Pronta && lineRenderer != null)
+    void LateUpdate()
+    {
+        if (lineRenderer != null)
         {
-            lineRenderer.SetPosition(0, transform.position); // Ponto 0: No Sapo
-            lineRenderer.SetPosition(1, pontaLinguaAtual);   // Ponto 1: Na ponta viajando
+            if (estadoLingua != EstadoLingua.Pronta)
+            {
+                lineRenderer.enabled = true;
+                lineRenderer.positionCount = 2; 
+                
+                Vector3 offsetReal = viradoDireita ? offsetBoca : new Vector3(-offsetBoca.x, offsetBoca.y, 0);
+                lineRenderer.SetPosition(0, transform.position + offsetReal);    
+                lineRenderer.SetPosition(1, pontaLinguaAtual); 
+            }
+            else
+            {
+                lineRenderer.enabled = false;
+            }
         }
     }
 
@@ -108,15 +129,12 @@ public class PlayerController : MonoBehaviour
     {
         VerificarColisoes();
 
-        // --- PRIORIDADE MÁXIMA: LÍNGUA ---
-        // Se a língua não estiver "Pronta", ela está em uso. O Sapo congela.
         if (estadoLingua != EstadoLingua.Pronta)
         {
             ProcessarFisicaLingua();
-            return; // Impede qualquer outro movimento
+            return; 
         }
 
-        // --- MOVIMENTO NORMAL ---
         float velAtual = (estadoAtual == Estado.Guerreiro) ? velGuerreiro : velSapo;
         
         if (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded)
@@ -137,140 +155,130 @@ public class PlayerController : MonoBehaviour
         if (isGrounded) pulosExtras = totalPulosSapo;
     }
 
-    // --- NOVA LÓGICA DA LÍNGUA ---
-
     void IniciarLingua()
     {
-        // 1. Configura direção
         Vector2 direcao = viradoDireita ? Vector2.right : Vector2.left;
 
-        // 2. Trava o Sapo imediatamente
         estadoLingua = EstadoLingua.Atirando;
         rb.gravityScale = 0;
         rb.linearVelocity = Vector2.zero;
-        pontaLinguaAtual = transform.position; // Língua nasce no corpo
+        
+        Vector3 offsetReal = viradoDireita ? offsetBoca : new Vector3(-offsetBoca.x, offsetBoca.y, 0);
+        Vector3 origemTiro = transform.position + offsetReal;
+        
+        pontaLinguaAtual = origemTiro; 
 
-        // 3. Raycast para decidir o destino
-        RaycastHit2D hit = Physics2D.Raycast(transform.position, direcao, alcanceLingua, layerSolido);
+        // O Raycast ignora o próprio colisor do player se estiver dentro dele (padrão do Unity)
+        RaycastHit2D hit = Physics2D.Raycast(origemTiro, direcao, alcanceLingua, layerSolido);
 
         if (hit.collider != null)
         {
+            // CORREÇÃO: Removi a checagem de distância mínima.
+            // Se bateu, bateu. Não importa se está colado.
             destinoLingua = hit.point;
             acertouParede = true;
         }
         else
         {
-            // Se não bater, destino é o ar no limite do alcance
-            destinoLingua = (Vector2)transform.position + (direcao * alcanceLingua);
+            destinoLingua = (Vector2)origemTiro + (direcao * alcanceLingua);
             acertouParede = false;
         }
-
-        // 4. Liga visual
-        if (lineRenderer != null) lineRenderer.enabled = true;
     }
 
     void ProcessarFisicaLingua()
     {
-        // Trava o corpo enquanto a língua opera (Redundância de segurança)
-        rb.linearVelocity = Vector2.zero; 
-
         switch (estadoLingua)
         {
             case EstadoLingua.Atirando:
-                // Move a ponta da língua até o destino
+                rb.linearVelocity = Vector2.zero; 
                 pontaLinguaAtual = Vector2.MoveTowards(pontaLinguaAtual, destinoLingua, velocidadeLinguaIda * Time.deltaTime);
 
-                // Chegou no destino?
                 if (Vector2.Distance(pontaLinguaAtual, destinoLingua) < 0.1f)
                 {
-                    if (acertouParede)
-                    {
-                        // Se bateu na parede, agora puxa o corpo
-                        estadoLingua = EstadoLingua.PuxandoSapo;
-                    }
-                    else
-                    {
-                        // Se bateu no ar, retrai a língua de volta
-                        estadoLingua = EstadoLingua.Retraindo;
-                    }
+                    if (acertouParede) estadoLingua = EstadoLingua.PuxandoSapo;
+                    else estadoLingua = EstadoLingua.Retraindo;
                 }
                 break;
 
             case EstadoLingua.PuxandoSapo:
-                // Move o CORPO do sapo até a ponta da língua (que está na parede)
+                // Lógica de colisão no caminho:
+                // Se o corpo bater em algo que não seja o destino, ele cai.
+                Collider2D colisorNoCaminho = Physics2D.OverlapCircle(transform.position, 0.5f, layerSolido);
+                float distParaDestino = Vector2.Distance(transform.position, destinoLingua);
+
+                if (colisorNoCaminho != null && distParaDestino > 1.0f) 
+                {
+                   estadoLingua = EstadoLingua.Retraindo;
+                   rb.gravityScale = 4; // Ativa gravidade para cair
+                   rb.linearVelocity = Vector2.zero; 
+                   break;
+                }
+
+                rb.linearVelocity = Vector2.zero; 
                 transform.position = Vector2.MoveTowards(transform.position, pontaLinguaAtual, velocidadePuxadaCorpo * Time.deltaTime);
 
-                // Se chegou na parede
-                if (Vector2.Distance(transform.position, pontaLinguaAtual) < 0.5f)
+                if (distParaDestino < 0.5f)
                 {
                     FinalizarLingua();
                 }
                 break;
 
             case EstadoLingua.Retraindo:
-                // A ponta da língua volta para o corpo do sapo (que está parado no ar)
-                pontaLinguaAtual = Vector2.MoveTowards(pontaLinguaAtual, transform.position, velocidadeLinguaVolta * Time.deltaTime);
+                if (rb.gravityScale == 0) rb.linearVelocity = Vector2.zero;
 
-                // Se a língua voltou pra boca
-                if (Vector2.Distance(pontaLinguaAtual, transform.position) < 0.1f)
+                Vector3 offsetReal = viradoDireita ? offsetBoca : new Vector3(-offsetBoca.x, offsetBoca.y, 0);
+                Vector3 alvoRetracao = transform.position + offsetReal;
+
+                pontaLinguaAtual = Vector2.MoveTowards(pontaLinguaAtual, alvoRetracao, velocidadeLinguaVolta * Time.deltaTime);
+
+                if (Vector2.Distance(pontaLinguaAtual, alvoRetracao) < 0.1f)
                 {
                     FinalizarLingua();
                 }
                 break;
-        }
-
-        // CANCELAMENTO MANUAL (Pulo cancela tudo)
-        if (jumpInputDown)
-        {
-            FinalizarLingua();
-            // Dá um pulinho pra não cair seco
-            rb.gravityScale = 4;
-            rb.AddForce(Vector2.up * puloSapo * 0.5f, ForceMode2D.Impulse);
-            jumpInputDown = false;
         }
     }
 
     void FinalizarLingua()
     {
         estadoLingua = EstadoLingua.Pronta;
-        rb.gravityScale = 4; // Devolve a gravidade
-        
-        if (lineRenderer != null) lineRenderer.enabled = false;
+        rb.gravityScale = 4; 
+        tempoParaProximaLingua = Time.time + delayEntreLinguadas;
     }
-
-
-    // --- LÓGICAS ANTIGAS ---
 
     void MovimentoNormal(float velAtual)
     {
         rb.gravityScale = 4; 
         wallStickTimer = tempoGrudadoNaParede; 
         rb.linearVelocity = new Vector2(xInput * velAtual, rb.linearVelocity.y);
+        
+        if (xInput > 0 && !viradoDireita) Flip();
+        else if (xInput < 0 && viradoDireita) Flip();
     }
 
     void MecanicaDeParedeoSapo()
     {
-        int direcaoParede = viradoDireita ? 1 : -1;
-
-        if (xInput != 0 && xInput != direcaoParede) // Sair da parede
+        if (xInput != 0 && xInput != ladoParede) 
         {
             rb.gravityScale = 4;
             rb.linearVelocity = new Vector2(xInput * velSapo, rb.linearVelocity.y);
-            Flip(); 
             return;
         }
 
-        if (yInput < 0) wallStickTimer = 0; // Deslizar manual
+        if (yInput < 0) wallStickTimer = 0; 
 
-        rb.linearVelocity = new Vector2(0, rb.linearVelocity.y); // Cola horizontalmente
+        rb.linearVelocity = new Vector2(0, rb.linearVelocity.y); 
 
-        if (wallStickTimer > 0) // Travado
+        if (wallStickTimer > 0) 
         {
             rb.gravityScale = 0;
             rb.linearVelocity = Vector2.zero; 
             wallStickTimer -= Time.deltaTime;
+            
+            if (ladoParede == 1 && viradoDireita) Flip();
+            else if (ladoParede == -1 && !viradoDireita) Flip();
         }
-        else // Deslizando
+        else 
         {
             rb.gravityScale = 4; 
             float velocidadeY = Mathf.Clamp(rb.linearVelocity.y, -velocidadeDeslizar, float.MaxValue);
@@ -304,10 +312,12 @@ public class PlayerController : MonoBehaviour
     void RealizarWallJump()
     {
         wallStickTimer = tempoGrudadoNaParede; 
-        int dir = viradoDireita ? -1 : 1;
+        int dirPulo = -ladoParede; 
         rb.linearVelocity = Vector2.zero;
-        rb.AddForce(new Vector2(dir * forcaWallJumpX, forcaWallJumpY), ForceMode2D.Impulse);
-        Flip();
+        rb.AddForce(new Vector2(dirPulo * forcaWallJumpX, forcaWallJumpY), ForceMode2D.Impulse);
+        
+        if (dirPulo == 1 && !viradoDireita) Flip();
+        else if (dirPulo == -1 && viradoDireita) Flip();
     }
 
     void VerificarColisoes()
@@ -315,8 +325,12 @@ public class PlayerController : MonoBehaviour
         float margem = 0.05f; 
         Bounds b = colisor.bounds;
         isGrounded = Physics2D.BoxCast(b.center, b.size, 0f, Vector2.down, margem, layerSolido);
-        Vector2 dir = viradoDireita ? Vector2.right : Vector2.left;
-        isTouchingWall = Physics2D.BoxCast(b.center, b.size, 0f, dir, margem, layerSolido);
+        Vector2 tamanhoSensorParede = new Vector2(b.size.x, b.size.y * 0.9f);
+        bool paredeDir = Physics2D.BoxCast(b.center, tamanhoSensorParede, 0f, Vector2.right, margem, layerSolido);
+        bool paredeEsq = Physics2D.BoxCast(b.center, tamanhoSensorParede, 0f, Vector2.left, margem, layerSolido);
+        if (paredeDir) { isTouchingWall = true; ladoParede = 1; }
+        else if (paredeEsq) { isTouchingWall = true; ladoParede = -1; }
+        else { isTouchingWall = false; ladoParede = 0; }
     }
 
     void Flip()
@@ -342,7 +356,8 @@ public class PlayerController : MonoBehaviour
         Gizmos.color = Color.red;
         Gizmos.DrawWireCube(colisor.bounds.center + Vector3.down * 0.05f, colisor.bounds.size);
         Gizmos.color = Color.yellow;
-        Vector3 dir = viradoDireita ? Vector3.right : Vector3.left;
-        Gizmos.DrawWireCube(colisor.bounds.center + dir * 0.05f, colisor.bounds.size);
+        Vector2 tamanhoSensorParede = new Vector2(colisor.bounds.size.x, colisor.bounds.size.y * 0.9f);
+        Gizmos.DrawWireCube(colisor.bounds.center + Vector3.right * 0.05f, tamanhoSensorParede);
+        Gizmos.DrawWireCube(colisor.bounds.center + Vector3.left * 0.05f, tamanhoSensorParede);
     }
 }

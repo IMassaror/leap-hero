@@ -470,7 +470,7 @@ MonoBehaviour:
   corGuerreiro: {r: 1, g: 1, b: 1, a: 1}
   velSapo: 7
   puloSapo: 15
-  totalPulosSapo: 1
+  totalPulosSapo: 0
   corSapo: {r: 0, g: 1, b: 0, a: 1}
   forcaWallJumpX: 10
   forcaWallJumpY: 14
@@ -480,8 +480,10 @@ MonoBehaviour:
   velocidadeLinguaIda: 20
   velocidadeLinguaVolta: 30
   velocidadePuxadaCorpo: 15
+  delayEntreLinguadas: 0.2
   teclaLingua: 108
   lineRenderer: {fileID: 615356734}
+  offsetBoca: {x: 0, y: 0.5, z: 0}
   isGrounded: 0
   isTouchingWall: 0
 --- !u!120 &615356734
@@ -510,7 +512,7 @@ LineRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 0}
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -531,13 +533,11 @@ LineRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_Positions:
-  - {x: 0, y: 0, z: 0}
-  - {x: 0, y: 0, z: 1}
+  m_SortingOrder: 10
+  m_Positions: []
   m_Parameters:
     serializedVersion: 3
-    widthMultiplier: 0.1
+    widthMultiplier: 0.7
     widthCurve:
       serializedVersion: 2
       m_Curve:
@@ -555,8 +555,8 @@ LineRenderer:
       m_RotationOrder: 4
     colorGradient:
       serializedVersion: 2
-      key0: {r: 0.8867924, g: 0.058561638, b: 0.1565038, a: 1}
-      key1: {r: 1, g: 1, b: 1, a: 1}
+      key0: {r: 1, g: 0, b: 0, a: 1}
+      key1: {r: 1, g: 0, b: 0, a: 1}
       key2: {r: 0, g: 0, b: 0, a: 0}
       key3: {r: 0, g: 0, b: 0, a: 0}
       key4: {r: 0, g: 0, b: 0, a: 0}
