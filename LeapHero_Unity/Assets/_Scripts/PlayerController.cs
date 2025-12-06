@@ -2,89 +2,229 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    // Criamos os "Estados" possíveis do personagem
     public enum Estado { Guerreiro, Sapo }
     public Estado estadoAtual;
 
-    [Header("Configuração Guerreiro")]
-    public float velocidadeGuerreiro = 4f;
+    [Header("Configurações Gerais")]
+    public LayerMask layerSolido; 
+
+    [Header("Guerreiro")]
+    public float velGuerreiro = 4f;
     public float puloGuerreiro = 12f;
-    public Color corGuerreiro = Color.white; // Branco (Armadura)
+    public Color corGuerreiro = Color.white;
 
-    [Header("Configuração Sapo")]
-    public float velocidadeSapo = 7f;
-    public float puloSapo = 16f;
-    public Color corSapo = Color.green;      // Verde (Sapo)
+    [Header("Sapo")]
+    public float velSapo = 7f;
+    public float puloSapo = 15f;
+    public int totalPulosSapo = 1;
+    public Color corSapo = Color.green;
 
-    [Header("Verificação de Chão")]
-    public Transform peDoPersonagem;
-    public LayerMask oQueEChao;
-    public bool estaNoChao;
+    [Header("Sapo - Wall Mechanics")]
+    public float forcaWallJumpX = 10f;
+    public float forcaWallJumpY = 14f;
+    public float velocidadeDeslizar = 2f; 
+    public float tempoGrudadoNaParede = 1.5f; 
 
-    // Variáveis internas
+    // --- VARIÁVEIS INTERNAS ---
     private Rigidbody2D rb;
-    private SpriteRenderer spriteRenderer;
-    private float inputHorizontal;
-    private float raioDoChao = 0.2f;
+    private SpriteRenderer sr;
+    private BoxCollider2D colisor;
+    
+    private float xInput;
+    private float yInput; // NOVO: Para detectar seta para baixo
+    private bool jumpInputDown;
+    private int pulosExtras;
+    private bool viradoDireita = true;
+
+    // Timer da Parede
+    private float wallStickTimer; 
+    
+    // Sensores
+    public bool isGrounded;
+    public bool isTouchingWall;
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
-        spriteRenderer = GetComponent<SpriteRenderer>(); // Para mudar a cor
-        
-        // Começa como Guerreiro
+        sr = GetComponent<SpriteRenderer>();
+        colisor = GetComponent<BoxCollider2D>();
         TrocarEstado(Estado.Guerreiro);
     }
 
     void Update()
     {
-        // 1. INPUT DE MOVIMENTO
-        inputHorizontal = Input.GetAxisRaw("Horizontal");
+        xInput = Input.GetAxisRaw("Horizontal");
+        yInput = Input.GetAxisRaw("Vertical"); // Lendo input vertical
+        
+        if (Input.GetButtonDown("Jump")) jumpInputDown = true;
 
-        // 2. DETECTAR PULO (Usa a força do estado atual)
-        if (Input.GetButtonDown("Jump") && estaNoChao)
-        {
-            float forcaPuloAtual = (estadoAtual == Estado.Guerreiro) ? puloGuerreiro : puloSapo;
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, forcaPuloAtual);
-        }
-
-        // 3. TRANSFORMAÇÃO (Tecla C)
         if (Input.GetKeyDown(KeyCode.C))
         {
-            if (estadoAtual == Estado.Guerreiro)
-                TrocarEstado(Estado.Sapo);
-            else
-                TrocarEstado(Estado.Guerreiro);
+            TrocarEstado(estadoAtual == Estado.Guerreiro ? Estado.Sapo : Estado.Guerreiro);
+        }
+
+        // FLIP: Só vira se NÃO estiver grudado na parede OU se estiver no chão
+        if (!isTouchingWall || isGrounded)
+        {
+             if (xInput > 0 && !viradoDireita) Flip();
+             else if (xInput < 0 && viradoDireita) Flip();
         }
     }
 
     void FixedUpdate()
     {
-        // Define a velocidade baseada no estado atual
-        float velocidadeAtual = (estadoAtual == Estado.Guerreiro) ? velocidadeGuerreiro : velocidadeSapo;
-        
-        rb.linearVelocity = new Vector2(inputHorizontal * velocidadeAtual, rb.linearVelocity.y);
+        VerificarColisoes();
 
-        // Verifica chão
-        estaNoChao = Physics2D.OverlapCircle(peDoPersonagem.position, raioDoChao, oQueEChao);
+        float velAtual = (estadoAtual == Estado.Guerreiro) ? velGuerreiro : velSapo;
+        
+        // --- LÓGICA DE MOVIMENTO ---
+        
+        // Se for Sapo, estiver na Parede e no Ar -> Mecânica de Parede
+        if (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded)
+        {
+            MecanicaDeParedeoSapo();
+        }
+        else
+        {
+            // Movimento Normal (Chão ou Ar livre)
+            rb.gravityScale = 4; 
+            wallStickTimer = tempoGrudadoNaParede; // Reseta o timer sempre que sai da parede
+            
+            rb.linearVelocity = new Vector2(xInput * velAtual, rb.linearVelocity.y);
+            
+            // Permite virar no ar se não estiver travado na parede
+            if (xInput > 0 && !viradoDireita) Flip();
+            else if (xInput < 0 && viradoDireita) Flip();
+        }
+
+        if (jumpInputDown)
+        {
+            jumpInputDown = false;
+            ProcessarPulo();
+        }
+
+        if (isGrounded) pulosExtras = totalPulosSapo;
     }
 
-    // Função dedicada para organizar a troca (State Pattern básico)
-    void TrocarEstado(Estado novoEstado)
+    void MecanicaDeParedeoSapo()
     {
-        estadoAtual = novoEstado;
+        int direcaoParede = viradoDireita ? 1 : -1;
 
-        if (estadoAtual == Estado.Guerreiro)
+        // 1. SAIR DA PAREDE: Se apertar para o lado OPOSTO -> Desgruda e cai
+        if (xInput != 0 && xInput != direcaoParede)
         {
-            spriteRenderer.color = corGuerreiro;
-            // Aqui vamos ativar a espada e desativar a lingua no futuro
-            Debug.Log("Transformou em GUERREIRO!");
+            rb.gravityScale = 4;
+            rb.linearVelocity = new Vector2(xInput * velSapo, rb.linearVelocity.y);
+            Flip(); 
+            return;
         }
-        else if (estadoAtual == Estado.Sapo)
+
+        // 2. FORÇAR DESLIZE: Se apertar para BAIXO -> Zera timer para deslizar
+        if (yInput < 0)
         {
-            spriteRenderer.color = corSapo;
-            // Aqui vamos ativar a lingua e o pulo duplo no futuro
-            Debug.Log("Transformou em SAPO!");
+            wallStickTimer = 0;
         }
+
+        // --- AUTO-STICK ---
+        // Trava movimento horizontal para grudar
+        rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
+
+        if (wallStickTimer > 0)
+        {
+            // FASE 1: TRAVADO (Grudado)
+            // Zera a gravidade e a velocidade Y para ficar parado
+            rb.gravityScale = 0;
+            rb.linearVelocity = Vector2.zero; 
+            wallStickTimer -= Time.deltaTime;
+        }
+        else
+        {
+            // FASE 2: DESLIZANDO (Slide)
+            // A gravidade volta
+            rb.gravityScale = 4; 
+            
+            // Limitamos a velocidade máxima de queda (Slide suave)
+            float velocidadeY = Mathf.Clamp(rb.linearVelocity.y, -velocidadeDeslizar, float.MaxValue);
+            rb.linearVelocity = new Vector2(0, velocidadeY);
+        }
+    }
+
+    void ProcessarPulo()
+    {
+        if (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded)
+        {
+            RealizarWallJump();
+        }
+        else if (isGrounded)
+        {
+            ExecutarPulo((estadoAtual == Estado.Guerreiro) ? puloGuerreiro : puloSapo);
+        }
+        else if (estadoAtual == Estado.Sapo && pulosExtras > 0)
+        {
+            ExecutarPulo(puloSapo);
+            pulosExtras--;
+        }
+    }
+
+    void ExecutarPulo(float forca)
+    {
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0); 
+        rb.AddForce(Vector2.up * forca, ForceMode2D.Impulse);
+    }
+
+    void RealizarWallJump()
+    {
+        // Ao pular da parede, resetamos o timer para permitir grudar na próxima parede (ou na mesma se voltar)
+        wallStickTimer = tempoGrudadoNaParede; 
+        
+        int dir = viradoDireita ? -1 : 1;
+        
+        rb.linearVelocity = Vector2.zero;
+        // Adiciona força diagonal
+        rb.AddForce(new Vector2(dir * forcaWallJumpX, forcaWallJumpY), ForceMode2D.Impulse);
+        
+        Flip();
+    }
+
+    void VerificarColisoes()
+    {
+        float margem = 0.05f; 
+        Bounds b = colisor.bounds;
+
+        // Chão
+        isGrounded = Physics2D.BoxCast(b.center, b.size, 0f, Vector2.down, margem, layerSolido);
+
+        // Parede
+        Vector2 dir = viradoDireita ? Vector2.right : Vector2.left;
+        isTouchingWall = Physics2D.BoxCast(b.center, b.size, 0f, dir, margem, layerSolido);
+    }
+
+    void Flip()
+    {
+        viradoDireita = !viradoDireita;
+        Vector3 escala = transform.localScale;
+        escala.x *= -1;
+        transform.localScale = escala;
+    }
+
+    void TrocarEstado(Estado novo)
+    {
+        estadoAtual = novo;
+        sr.color = (estadoAtual == Estado.Guerreiro) ? corGuerreiro : corSapo;
+        pulosExtras = (estadoAtual == Estado.Sapo) ? totalPulosSapo : 0;
+        rb.gravityScale = 4;
+        
+        if(novo == Estado.Guerreiro) wallStickTimer = 0; 
+    }
+    
+    void OnDrawGizmos()
+    {
+        if (colisor == null) return;
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireCube(colisor.bounds.center + Vector3.down * 0.05f, colisor.bounds.size);
+        
+        Gizmos.color = Color.yellow;
+        Vector3 dir = viradoDireita ? Vector3.right : Vector3.left;
+        Gizmos.DrawWireCube(colisor.bounds.center + dir * 0.05f, colisor.bounds.size);
     }
 }
