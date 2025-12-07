@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="3" height="3" tilewidth="8" tileheight="8" infinite="0" nextlayerid="7" nextobjectid="1">
+ <tileset firstgid="1" source="cave_tileset.tsx"/>
+ <tileset firstgid="66" source=":/automap-tiles.tsx"/>
+ <layer id="1" name="input_cave" width="3" height="3">
+  <data encoding="csv">
+0,0,0,
+0,15,0,
+0,0,0
+</data>
+ </layer>
+ <layer id="2" name="output1_cave_random" width="3" height="3" visible="0">
+  <properties>
+   <property name="Probability" type="float" value="0.1"/>
+  </properties>
+  <data encoding="csv">
+0,0,0,
+0,69,0,
+0,0,0
+</data>
+ </layer>
+ <layer id="6" name="output2_cave_random" width="3" height="3" visible="0">
+  <properties>
+   <property name="Probability" type="float" value="0.15"/>
+  </properties>
+  <data encoding="csv">
+0,0,0,
+0,30,0,
+0,0,0
+</data>
+ </layer>
+ <layer id="3" name="output3_cave_random" width="3" height="3" visible="0">
+  <properties>
+   <property name="Probability" type="float" value="0.15"/>
+  </properties>
+  <data encoding="csv">
+0,0,0,
+0,41,0,
+0,0,0
+</data>
+ </layer>
+ <layer id="4" name="output4_cave_random" width="3" height="3" visible="0">
+  <properties>
+   <property name="Probability" type="float" value="1.5"/>
+  </properties>
+  <data encoding="csv">
+0,0,0,
+0,29,0,
+0,0,0
+</data>
+ </layer>
+</map>
