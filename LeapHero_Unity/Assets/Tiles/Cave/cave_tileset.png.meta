@@ -1081,7 +1081,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: cave_tileset_42
+      name: cave_prop1
       rect:
         serializedVersion: 2
         x: 72
@@ -1103,7 +1103,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: cave_tileset_43
+      name: cave_prop2
       rect:
         serializedVersion: 2
         x: 80
@@ -1125,7 +1125,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: cave_tileset_44
+      name: cave_prop3
       rect:
         serializedVersion: 2
         x: 88
@@ -1147,7 +1147,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: cave_tileset_45
+      name: cave_prop4
       rect:
         serializedVersion: 2
         x: 96
@@ -2394,6 +2394,10 @@ TextureImporter:
       - key: SpriteEditor.SliceSettings
         value: '{"sliceOnImport":false,"gridCellCount":{"x":1.0,"y":1.0},"gridSpriteSize":{"x":8.0,"y":8.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.5},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"pivotUnitMode":0,"slicingType":1,"keepEmptyRects":false,"isAlternate":false}'
     nameFileIdTable:
+      cave_prop1: 1827610470
+      cave_prop2: 293488748
+      cave_prop3: -1553776509
+      cave_prop4: 823690213
       cave_tileset_0: -5156352867933855857
       cave_tileset_1: 2410855964841853224
       cave_tileset_10: -459090916385118345
@@ -2432,10 +2436,6 @@ TextureImporter:
       cave_tileset_4: -3103018481658000730
       cave_tileset_40: -458346589
       cave_tileset_41: -197100371
-      cave_tileset_42: 1827610470
-      cave_tileset_43: 293488748
-      cave_tileset_44: -1553776509
-      cave_tileset_45: 823690213
       cave_tileset_46: -927696296
       cave_tileset_47: 1769331697
       cave_tileset_48: -1901842655
