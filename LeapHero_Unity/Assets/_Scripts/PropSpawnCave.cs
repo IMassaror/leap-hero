@@ -16,6 +16,9 @@ public class propTileReplacer : MonoBehaviour
     [Header("Wiggling Props")]
     public List<string> wiggleNames;
 
+    [Header("Hurting Props")]
+    public List<string> hurtNames;
+
     [Header("Pivot Offset")]
     public float yOffset = -0.5f;
 
@@ -51,6 +54,13 @@ public class propTileReplacer : MonoBehaviour
                 {
                     if (obj.GetComponent<PropWiggle>() == null)
                         obj.AddComponent<PropWiggle>();
+                }
+
+                // SE o tile estiver marcado como "hurt", adiciona o componente
+                if (hurtNames.Contains(tileName))
+                {
+                    if (obj.GetComponent<PropHurt>() == null)
+                        obj.AddComponent<PropHurt>();
                 }
 
                 // Remove tile original

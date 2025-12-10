@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 13312, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: cave_tileset_18
+  m_Name: spike_b
   m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.Tilemaps.Tile
-  m_Sprite: {fileID: -2477321432101564407, guid: 135b90e2591a6cd4593772963198476a, type: 3}
+  m_Sprite: {fileID: -1847478133570073814, guid: 135b90e2591a6cd4593772963198476a, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Transform:
     e00: 1
