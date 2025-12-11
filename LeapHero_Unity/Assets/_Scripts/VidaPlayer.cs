@@ -7,13 +7,15 @@ public class VidaPlayer : MonoBehaviour
     [Header("Configurações")]
     public int vidaGuerreiroMaxima = 3;
     public int vidaAtual;
+    public float tempoParaReiniciar = 2.0f; // NOVO: Tempo para ver a animação de morte
     
     [Header("Invencibilidade")]
     public float tempoInvencivel = 1.0f;
-    public SpriteRenderer spriteRenderer; // Arraste o Sprite do Player aqui
+    public SpriteRenderer spriteRenderer; 
 
     private PlayerController playerController;
     private bool estaInvencivel = false;
+    private bool jaMorreu = false; // Para não morrer duas vezes seguidas
 
     void Start()
     {
@@ -24,7 +26,7 @@ public class VidaPlayer : MonoBehaviour
 
     public void TomarDano(int dano)
     {
-        if (estaInvencivel || vidaAtual <= 0) return;
+        if (estaInvencivel || vidaAtual <= 0 || jaMorreu) return;
 
         // REGRA: Sapo morre com 1 hit (Glass Cannon)
         if (playerController.estadoAtual == PlayerController.Estado.Sapo)
@@ -50,7 +52,26 @@ public class VidaPlayer : MonoBehaviour
 
     void Morrer()
     {
-        Debug.Log("GAME OVER - Reiniciando Fase");
+        if(jaMorreu) return;
+        jaMorreu = true;
+
+        // 1. Avisa o PlayerController para travar movimento e tocar animação
+        if(playerController != null)
+        {
+            playerController.Morrer();
+        }
+
+        Debug.Log("GAME OVER - Esperando animação para reiniciar...");
+        
+        // 2. Espera um pouco antes de resetar a cena
+        StartCoroutine(ReiniciarFase());
+    }
+
+    IEnumerator ReiniciarFase()
+    {
+        // Espera o tempo da animação (configurável no Inspector)
+        yield return new WaitForSeconds(tempoParaReiniciar);
+        
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 

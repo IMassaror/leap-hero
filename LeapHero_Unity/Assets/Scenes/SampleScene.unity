@@ -218,10 +218,10 @@ Camera:
   m_LensShift: {x: 0, y: 0}
   m_NormalizedViewPortRect:
     serializedVersion: 2
-    x: 0.13630168
-    y: 0.065123014
-    width: 0.7269423
-    height: 0.8683068
+    x: 0.13636363
+    y: 0.06506024
+    width: 0.7272727
+    height: 0.8674699
   near clip plane: 0.3
   far clip plane: 1000
   field of view: 34
@@ -296,6 +296,7 @@ GameObject:
   - component: {fileID: 615356733}
   - component: {fileID: 615356734}
   - component: {fileID: 615356735}
+  - component: {fileID: 615356736}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -621,8 +622,31 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VidaPlayer
   vidaGuerreiroMaxima: 3
   vidaAtual: 0
+  tempoParaReiniciar: 2
   tempoInvencivel: 1
   spriteRenderer: {fileID: 615356729}
+--- !u!95 &615356736
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 615356728}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 882042de285d278409fcd6a2cd42c7a2, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0
