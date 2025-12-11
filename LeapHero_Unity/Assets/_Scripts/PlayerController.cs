@@ -122,7 +122,7 @@ public class PlayerController : MonoBehaviour
                 jumpInputDown = true;
             }
             // Prioridade 3: Pulo Duplo (No Ar, Sapo, Tem Carga e NÃO está na parede)
-            else if (estadoAtual == Estado.Sapo && canDoubleJump)
+            else if (estadoAtual == Estado.Sapo && canDoubleJump && excalibroScript != null)
             {
                 ExecutarPuloDuplo();
             }
