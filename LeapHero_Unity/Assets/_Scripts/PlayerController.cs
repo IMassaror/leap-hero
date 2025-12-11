@@ -10,6 +10,9 @@ public class PlayerController : MonoBehaviour
     public enum EstadoLingua { Pronta, Atirando, PuxandoSapo, Retraindo }
     public EstadoLingua estadoLingua = EstadoLingua.Pronta;
 
+    [Header("Conexões")]
+    public ExcalibroController excalibroScript; // ARRASTE O EXCALIBRO AQUI
+
     [Header("Geral")]
     public LayerMask layerSolido; 
 
@@ -28,10 +31,14 @@ public class PlayerController : MonoBehaviour
     private float tempoProximoAtaque;
     private bool estaAtacando = false; 
 
+    [Header("Guerreiro - Excalibur (Pogo)")]
+    public float forcaPogo = 14f; 
+    public Transform pontoPogo;   
+    public float raioPogo = 0.6f;
+
     [Header("Sapo - Movimento")]
     public float velSapo = 7f;
     public float puloSapo = 15f;
-    public int totalPulosSapo = 1;
     public Color corSapo = Color.green;
 
     [Header("Sapo - Wall Mechanics")]
@@ -61,7 +68,6 @@ public class PlayerController : MonoBehaviour
     private float xInput;
     private float yInput;
     private bool jumpInputDown;
-    private int pulosExtras;
     private bool viradoDireita = true;
     private float wallStickTimer; 
     private float wallJumpBlockTimer; 
@@ -74,9 +80,10 @@ public class PlayerController : MonoBehaviour
     private Vector2 posicaoInicialTiro; 
     public bool isGrounded;
     public bool isTouchingWall;
-    
-    // NOVO: Controle de Morte
     private bool isDead = false;
+
+    // CONTROLE DE PULO DUPLO
+    private bool canDoubleJump = false; 
 
     void Start()
     {
@@ -86,30 +93,46 @@ public class PlayerController : MonoBehaviour
         anim = GetComponent<Animator>(); 
 
         if(lineRenderer != null) lineRenderer.enabled = false;
+        
         TrocarEstado(Estado.Guerreiro);
     }
 
     void Update()
     {
-        // 1. CHECAGEM DE MORTE (NOVO!)
-        if (isDead) return; // Se morreu, para tudo aqui. Não lê input nenhum.
+        if (isDead) return;
 
-        // 2. INPUTS
+        // 1. INPUTS
         if (estaAtacando) xInput = 0;
         else xInput = Input.GetAxisRaw("Horizontal");
         yInput = Input.GetAxisRaw("Vertical");
 
         if (wallJumpBlockTimer > 0) wallJumpBlockTimer -= Time.deltaTime;
 
-        // 3. PULO
+        // 2. SISTEMA DE PULO UNIFICADO
         if (estadoLingua == EstadoLingua.Pronta && Input.GetButtonDown("Jump") && !estaAtacando) 
-            jumpInputDown = true;
+        {
+            // Prioridade 1: Pulo do Chão
+            if (isGrounded)
+            {
+                jumpInputDown = true;
+            }
+            // Prioridade 2: Wall Jump (Sapo na Parede e Fora do Chão)
+            else if (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded)
+            {
+                jumpInputDown = true;
+            }
+            // Prioridade 3: Pulo Duplo (No Ar, Sapo, Tem Carga e NÃO está na parede)
+            else if (estadoAtual == Estado.Sapo && canDoubleJump)
+            {
+                ExecutarPuloDuplo();
+            }
+        }
 
-        // 4. TROCA DE ESTADO
+        // 3. TROCA DE ESTADO
         if (Input.GetKeyDown(KeyCode.C) && !estaAtacando) 
             TrocarEstado(estadoAtual == Estado.Guerreiro ? Estado.Sapo : Estado.Guerreiro);
 
-        // 5. HABILIDADES
+        // 4. LÍNGUA
         if (estadoAtual == Estado.Sapo && estadoLingua == EstadoLingua.Pronta && Input.GetKeyDown(teclaLingua) && Time.time > tempoParaProximaLingua) 
         {
             if (xInput > 0 && !viradoDireita) Flip();
@@ -117,9 +140,11 @@ public class PlayerController : MonoBehaviour
             IniciarLingua();
         }
 
+        // 5. COMBATE GUERREIRO (Pogo)
         if (estadoAtual == Estado.Guerreiro && Input.GetKeyDown(teclaAtaque) && Time.time > tempoProximoAtaque && !estaAtacando)
         {
-            StartCoroutine(RealizarAtaque());
+            if (!isGrounded && yInput < -0.1f) StartCoroutine(RealizarPogo());
+            else StartCoroutine(RealizarAtaque());
         }
 
         // 6. FLIP
@@ -129,90 +154,98 @@ public class PlayerController : MonoBehaviour
              else if (xInput < 0 && viradoDireita) Flip();
         }
 
-        // 7. ATUALIZA ANIMATOR
         AtualizarAnimator();
     }
 
-    // --- FUNÇÃO PÚBLICA PARA O SCRIPT DE VIDA CHAMAR (NOVO!) ---
     public void Morrer()
     {
-        if (isDead) return; // Já está morto
+        if (isDead) return;
         isDead = true;
-        
-        // Para a física
         rb.linearVelocity = Vector2.zero;
-        rb.gravityScale = 1; // Deixa cair no chão se estiver voando
-        
-        // Toca animação
+        rb.gravityScale = 1; 
         if (anim != null) anim.SetTrigger("Die");
-        
-        // Desativa colisores se quiser que ele atravesse o chão (opcional)
-        // colisor.enabled = false; 
-        
-        Debug.Log("O Player Morreu!");
+        if (excalibroScript != null) excalibroScript.Sumir();
     }
 
     void AtualizarAnimator()
     {
         if (anim == null) return;
-
         anim.SetFloat("Speed", Mathf.Abs(xInput));
         anim.SetFloat("VerticalVelocity", rb.linearVelocity.y);
         anim.SetBool("IsGrounded", isGrounded);
         anim.SetBool("IsSapo", estadoAtual == Estado.Sapo);
-        
         bool deslizando = (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded && rb.linearVelocity.y < 0);
         anim.SetBool("IsWallSliding", deslizando);
-
-        // IsGrappling mantém a pose da língua esticada enquanto ela não volta
         anim.SetBool("IsGrappling", estadoLingua != EstadoLingua.Pronta);
+    }
+
+    IEnumerator RealizarPogo()
+    {
+        estaAtacando = true; 
+        tempoProximoAtaque = Time.time + 0.2f; 
+        if (anim != null) anim.SetTrigger("AttackDown"); 
+        yield return new WaitForSeconds(0.05f);
+
+        Collider2D[] acertos = Physics2D.OverlapCircleAll(pontoPogo.position, raioPogo, layerInimigos);
+        bool acertouAlgo = false;
+        foreach (Collider2D alvo in acertos)
+        {
+            Destroy(alvo.gameObject); 
+            acertouAlgo = true;
+        }
+
+        if (acertouAlgo)
+        {
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
+            rb.AddForce(Vector2.up * forcaPogo, ForceMode2D.Impulse);
+        }
+        yield return new WaitForSeconds(0.1f);
+        estaAtacando = false;
     }
 
     IEnumerator RealizarAtaque()
     {
         estaAtacando = true;
         tempoProximoAtaque = Time.time + cooldownAtaque;
-
         float gravidadeOriginal = rb.gravityScale;
         rb.gravityScale = 0; 
         rb.linearVelocity = Vector2.zero; 
-
         if (anim != null) anim.SetTrigger("Attack"); 
-
         Collider2D[] inimigos = Physics2D.OverlapCircleAll(pontoAtaque.position, raioAtaque, layerInimigos);
-        foreach (Collider2D inimigo in inimigos)
-        {
-            // Aqui você chamaria o script de vida do inimigo
-            Destroy(inimigo.gameObject);
-        }
-
+        foreach (Collider2D inimigo in inimigos) Destroy(inimigo.gameObject);
         yield return new WaitForSeconds(duracaoTravamentoAereo);
-
         rb.gravityScale = gravidadeOriginal; 
         estaAtacando = false;
     }
 
     void LateUpdate()
     {
-        if (lineRenderer != null)
+        if (lineRenderer != null && estadoLingua != EstadoLingua.Pronta)
         {
-            if (estadoLingua != EstadoLingua.Pronta)
-            {
-                lineRenderer.enabled = true;
-                lineRenderer.positionCount = 2; 
-                Vector3 offsetReal = viradoDireita ? offsetBoca : new Vector3(-offsetBoca.x, offsetBoca.y, 0);
-                lineRenderer.SetPosition(0, transform.position + offsetReal);    
-                lineRenderer.SetPosition(1, pontaLinguaAtual); 
-            }
-            else lineRenderer.enabled = false;
+            lineRenderer.enabled = true;
+            lineRenderer.positionCount = 2; 
+            Vector3 offsetReal = viradoDireita ? offsetBoca : new Vector3(-offsetBoca.x, offsetBoca.y, 0);
+            lineRenderer.SetPosition(0, transform.position + offsetReal);    
+            lineRenderer.SetPosition(1, pontaLinguaAtual); 
         }
+        else if(lineRenderer != null) lineRenderer.enabled = false;
     }
 
     void FixedUpdate()
     {
-        if (isDead) return; // (NOVO!) Morto não processa física de movimento
-
+        if (isDead) return;
         VerificarColisoes();
+        
+        // RECARREGA PULO DUPLO NO CHÃO OU NA PAREDE
+        if (isGrounded || isTouchingWall)
+        {
+            if(!canDoubleJump)
+            {
+                canDoubleJump = true; // Recarrega
+                if(excalibroScript != null && estadoAtual == Estado.Sapo) 
+                    excalibroScript.Recarregar(); // Fica colorida dnv
+            }
+        }
 
         if (estadoLingua != EstadoLingua.Pronta) { ProcessarFisicaLingua(); return; }
         if (estaAtacando) return; 
@@ -223,7 +256,6 @@ public class PlayerController : MonoBehaviour
         else MovimentoNormal(velAtual);
 
         if (jumpInputDown) { jumpInputDown = false; ProcessarPulo(); }
-        if (isGrounded) pulosExtras = totalPulosSapo;
     }
 
     void MovimentoNormal(float velAtual) {
@@ -239,7 +271,6 @@ public class PlayerController : MonoBehaviour
         if (tentandoSair && timerTentativaSair > tempoResistenciaParede) {
             rb.gravityScale = 4; rb.linearVelocity = new Vector2(xInput * velSapo, rb.linearVelocity.y); return;
         }
-        
         rb.linearVelocity = new Vector2(0, rb.linearVelocity.y); 
         if (wallStickTimer > 0) {
             rb.gravityScale = 0;
@@ -258,15 +289,16 @@ public class PlayerController : MonoBehaviour
         int dirPulo = -ladoParede; rb.linearVelocity = Vector2.zero; 
         rb.AddForce(new Vector2(dirPulo * forcaWallJumpX, forcaWallJumpY), ForceMode2D.Impulse);
         if (dirPulo == 1 && !viradoDireita) Flip(); else if (dirPulo == -1 && viradoDireita) Flip();
+        
+        // Wall Jump recarrega o pulo duplo
+        canDoubleJump = true; 
+        if(excalibroScript != null) excalibroScript.Recarregar();
     }
 
     void IniciarLingua() {
         Vector2 direcao = viradoDireita ? Vector2.right : Vector2.left;
         estadoLingua = EstadoLingua.Atirando; 
-        
-        // (NOVO!) Dispara o Trigger da animação de cuspir
         if(anim != null) anim.SetTrigger("TongueShoot");
-
         rb.gravityScale = 0; rb.linearVelocity = Vector2.zero;
         posicaoInicialTiro = transform.position;
         Vector3 offsetReal = viradoDireita ? offsetBoca : new Vector3(-offsetBoca.x, offsetBoca.y, 0);
@@ -302,12 +334,37 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    void FinalizarLingua() { estadoLingua = EstadoLingua.Pronta; rb.gravityScale = 4; tempoParaProximaLingua = Time.time + delayEntreLinguadas; }
+    void FinalizarLingua() { 
+        estadoLingua = EstadoLingua.Pronta; 
+        rb.gravityScale = 4; 
+        tempoParaProximaLingua = Time.time + delayEntreLinguadas;
+        canDoubleJump = true; 
+        if(excalibroScript != null) excalibroScript.Recarregar();
+    }
     
     void ProcessarPulo() {
-        if (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded) RealizarWallJump();
-        else if (isGrounded) ExecutarPulo((estadoAtual == Estado.Guerreiro) ? puloGuerreiro : puloSapo);
-        else if (estadoAtual == Estado.Sapo && pulosExtras > 0) { ExecutarPulo(puloSapo); pulosExtras--; }
+        if (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded) 
+        {
+            RealizarWallJump();
+        }
+        else 
+        {
+            float forca = (estadoAtual == Estado.Guerreiro) ? puloGuerreiro : puloSapo;
+            ExecutarPulo(forca);
+        }
+    }
+
+    void ExecutarPuloDuplo()
+    {
+        canDoubleJump = false; 
+        
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
+        rb.AddForce(Vector2.up * puloSapo, ForceMode2D.Impulse);
+
+        // AVISA A ESPADA QUE GASTOU
+        if(excalibroScript != null) excalibroScript.UsarPulo();
+
+        Debug.Log("Excalibro Jump!");
     }
 
     void ExecutarPulo(float forca) { rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0); rb.AddForce(Vector2.up * forca, ForceMode2D.Impulse); }
@@ -326,10 +383,14 @@ public class PlayerController : MonoBehaviour
     void TrocarEstado(Estado novo) { 
         estadoAtual = novo; 
         sr.color = (estadoAtual == Estado.Guerreiro) ? corGuerreiro : corSapo; 
-        
         if(anim != null) anim.SetBool("IsSapo", estadoAtual == Estado.Sapo);
+        
+        if(excalibroScript != null)
+        {
+            if(novo == Estado.Sapo) excalibroScript.Aparecer();
+            else excalibroScript.Sumir();
+        }
 
-        pulosExtras = (estadoAtual == Estado.Sapo) ? totalPulosSapo : 0; 
         rb.gravityScale = 4; 
         if(novo == Estado.Guerreiro) wallStickTimer = 0; 
     }
@@ -337,9 +398,7 @@ public class PlayerController : MonoBehaviour
     void OnDrawGizmos() {
         if (colisor == null) return;
         Gizmos.color = Color.red; Gizmos.DrawWireCube(colisor.bounds.center + Vector3.down * 0.05f, colisor.bounds.size);
-        if (pontoAtaque != null) {
-            Gizmos.color = Color.cyan;
-            Gizmos.DrawWireSphere(pontoAtaque.position, raioAtaque);
-        }
+        if (pontoAtaque != null) { Gizmos.color = Color.cyan; Gizmos.DrawWireSphere(pontoAtaque.position, raioAtaque); }
+        if (pontoPogo != null) { Gizmos.color = Color.yellow; Gizmos.DrawWireSphere(pontoPogo.position, raioPogo); }
     }
 }
