@@ -11,7 +11,7 @@ public class PlayerController : MonoBehaviour
     public EstadoLingua estadoLingua = EstadoLingua.Pronta;
 
     [Header("Conexões")]
-    public ExcalibroController excalibroScript; // ARRASTE O EXCALIBRO AQUI
+    public ExcalibroController excalibroScript; 
 
     [Header("Geral")]
     public LayerMask layerSolido; 
@@ -108,20 +108,18 @@ public class PlayerController : MonoBehaviour
 
         if (wallJumpBlockTimer > 0) wallJumpBlockTimer -= Time.deltaTime;
 
-        // 2. SISTEMA DE PULO UNIFICADO
+        // 2. SISTEMA DE PULO
         if (estadoLingua == EstadoLingua.Pronta && Input.GetButtonDown("Jump") && !estaAtacando) 
         {
-            // Prioridade 1: Pulo do Chão
             if (isGrounded)
             {
                 jumpInputDown = true;
             }
-            // Prioridade 2: Wall Jump (Sapo na Parede e Fora do Chão)
             else if (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded)
             {
                 jumpInputDown = true;
             }
-            // Prioridade 3: Pulo Duplo (No Ar, Sapo, Tem Carga e NÃO está na parede)
+            // Só pula duplo se tiver a espada E tiver carga
             else if (estadoAtual == Estado.Sapo && canDoubleJump && excalibroScript != null)
             {
                 ExecutarPuloDuplo();
@@ -236,14 +234,14 @@ public class PlayerController : MonoBehaviour
         if (isDead) return;
         VerificarColisoes();
         
-        // RECARREGA PULO DUPLO NO CHÃO OU NA PAREDE
-        if (isGrounded || isTouchingWall)
+        // CORREÇÃO: Pulo duplo SÓ recarrega no CHÃO
+        if (isGrounded)
         {
             if(!canDoubleJump)
             {
-                canDoubleJump = true; // Recarrega
+                canDoubleJump = true; 
                 if(excalibroScript != null && estadoAtual == Estado.Sapo) 
-                    excalibroScript.Recarregar(); // Fica colorida dnv
+                    excalibroScript.Recarregar();
             }
         }
 
@@ -290,9 +288,7 @@ public class PlayerController : MonoBehaviour
         rb.AddForce(new Vector2(dirPulo * forcaWallJumpX, forcaWallJumpY), ForceMode2D.Impulse);
         if (dirPulo == 1 && !viradoDireita) Flip(); else if (dirPulo == -1 && viradoDireita) Flip();
         
-        // Wall Jump recarrega o pulo duplo
-        canDoubleJump = true; 
-        if(excalibroScript != null) excalibroScript.Recarregar();
+        // CORREÇÃO: Wall Jump NÃO recarrega mais o pulo duplo
     }
 
     void IniciarLingua() {
@@ -316,15 +312,27 @@ public class PlayerController : MonoBehaviour
                 if (Vector2.Distance(pontaLinguaAtual, destinoLingua) < 0.1f) {
                     if (acertouParede) estadoLingua = EstadoLingua.PuxandoSapo; else estadoLingua = EstadoLingua.Retraindo;
                 } break;
+
             case EstadoLingua.PuxandoSapo:
-                float distOrigem = Vector2.Distance(transform.position, posicaoInicialTiro);
-                float distDestino = Vector2.Distance(transform.position, destinoLingua);
-                if (distOrigem > 0.5f) {
-                    Collider2D col = Physics2D.OverlapCircle(transform.position, 0.5f, layerSolido);
-                    if (col != null && distDestino > 1.0f) { estadoLingua = EstadoLingua.Retraindo; rb.gravityScale = 4; rb.linearVelocity = Vector2.zero; break; }
+                // CORREÇÃO: Verifica se tem obstáculo no caminho antes de mover
+                Vector2 direcaoPuxada = (destinoLingua - (Vector2)transform.position).normalized;
+                // Raio curto na frente do personagem (0.6f é um pouco mais que o raio do corpo)
+                RaycastHit2D obstaculo = Physics2D.Raycast(transform.position, direcaoPuxada, 0.6f, layerSolido);
+                
+                // Se bateu em algo e a distância para o destino ainda é grande (não é a parede alvo)
+                if (obstaculo.collider != null && Vector2.Distance(transform.position, destinoLingua) > 1.0f)
+                {
+                    FinalizarLingua(); // Cancela se bater num bloco no meio do caminho
+                    break;
                 }
-                rb.linearVelocity = Vector2.zero; transform.position = Vector2.MoveTowards(transform.position, pontaLinguaAtual, velocidadePuxadaCorpo * Time.deltaTime);
-                if (distDestino < 0.5f) FinalizarLingua(); break;
+
+                rb.linearVelocity = Vector2.zero; 
+                transform.position = Vector2.MoveTowards(transform.position, pontaLinguaAtual, velocidadePuxadaCorpo * Time.deltaTime);
+                
+                float distDestino = Vector2.Distance(transform.position, destinoLingua);
+                if (distDestino < 0.5f) FinalizarLingua(); 
+                break;
+
             case EstadoLingua.Retraindo:
                 if (rb.gravityScale == 0) rb.linearVelocity = Vector2.zero;
                 Vector3 offsetReal = viradoDireita ? offsetBoca : new Vector3(-offsetBoca.x, offsetBoca.y, 0);
@@ -338,8 +346,8 @@ public class PlayerController : MonoBehaviour
         estadoLingua = EstadoLingua.Pronta; 
         rb.gravityScale = 4; 
         tempoParaProximaLingua = Time.time + delayEntreLinguadas;
-        canDoubleJump = true; 
-        if(excalibroScript != null) excalibroScript.Recarregar();
+        
+        // CORREÇÃO: Língua NÃO recarrega o pulo duplo. Apenas chão.
     }
     
     void ProcessarPulo() {
@@ -357,13 +365,9 @@ public class PlayerController : MonoBehaviour
     void ExecutarPuloDuplo()
     {
         canDoubleJump = false; 
-        
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
         rb.AddForce(Vector2.up * puloSapo, ForceMode2D.Impulse);
-
-        // AVISA A ESPADA QUE GASTOU
         if(excalibroScript != null) excalibroScript.UsarPulo();
-
         Debug.Log("Excalibro Jump!");
     }
 
