@@ -78,6 +78,10 @@ public class PlayerController : MonoBehaviour
     private bool acertouParede;          
     private float tempoParaProximaLingua;
     private Vector2 posicaoInicialTiro; 
+    
+    // VARIÁVEIS DE SEGURANÇA (NOVO)
+    private float tempoInicioPuxada; // Para evitar loops infinitos
+
     public bool isGrounded;
     public bool isTouchingWall;
     private bool isDead = false;
@@ -119,7 +123,6 @@ public class PlayerController : MonoBehaviour
             {
                 jumpInputDown = true;
             }
-            // Só pula duplo se tiver a espada E tiver carga
             else if (estadoAtual == Estado.Sapo && canDoubleJump && excalibroScript != null)
             {
                 ExecutarPuloDuplo();
@@ -138,7 +141,7 @@ public class PlayerController : MonoBehaviour
             IniciarLingua();
         }
 
-        // 5. COMBATE GUERREIRO (Pogo)
+        // 5. COMBATE GUERREIRO
         if (estadoAtual == Estado.Guerreiro && Input.GetKeyDown(teclaAtaque) && Time.time > tempoProximoAtaque && !estaAtacando)
         {
             if (!isGrounded && yInput < -0.1f) StartCoroutine(RealizarPogo());
@@ -153,6 +156,21 @@ public class PlayerController : MonoBehaviour
         }
 
         AtualizarAnimator();
+    }
+
+    // --- CORREÇÃO DE BUG: COLISÃO ENQUANTO PUXA ---
+    void OnCollisionEnter2D(Collision2D collision)
+    {
+        // Se bater em qualquer coisa sólida ENQUANTO está sendo puxado
+        if (estadoLingua == EstadoLingua.PuxandoSapo)
+        {
+            // Verifica se o objeto colidido é da camada Sólida
+            if (((1 << collision.gameObject.layer) & layerSolido) != 0)
+            {
+                Debug.Log("Colisão detectada durante a puxada! Cancelando língua.");
+                FinalizarLingua();
+            }
+        }
     }
 
     public void Morrer()
@@ -234,7 +252,6 @@ public class PlayerController : MonoBehaviour
         if (isDead) return;
         VerificarColisoes();
         
-        // CORREÇÃO: Pulo duplo SÓ recarrega no CHÃO
         if (isGrounded)
         {
             if(!canDoubleJump)
@@ -287,24 +304,38 @@ public class PlayerController : MonoBehaviour
         int dirPulo = -ladoParede; rb.linearVelocity = Vector2.zero; 
         rb.AddForce(new Vector2(dirPulo * forcaWallJumpX, forcaWallJumpY), ForceMode2D.Impulse);
         if (dirPulo == 1 && !viradoDireita) Flip(); else if (dirPulo == -1 && viradoDireita) Flip();
-        
-        // CORREÇÃO: Wall Jump NÃO recarrega mais o pulo duplo
     }
 
     void IniciarLingua() {
         Vector2 direcao = viradoDireita ? Vector2.right : Vector2.left;
         estadoLingua = EstadoLingua.Atirando; 
         if(anim != null) anim.SetTrigger("TongueShoot");
-        rb.gravityScale = 0; rb.linearVelocity = Vector2.zero;
+        
+        rb.gravityScale = 0; 
+        rb.linearVelocity = Vector2.zero;
+        
+        // Timer de segurança (NOVO)
+        tempoInicioPuxada = Time.time; 
+        
         posicaoInicialTiro = transform.position;
         Vector3 offsetReal = viradoDireita ? offsetBoca : new Vector3(-offsetBoca.x, offsetBoca.y, 0);
         Vector3 origemTiro = transform.position + offsetReal; pontaLinguaAtual = origemTiro; 
+        
         RaycastHit2D hit = Physics2D.Raycast(origemTiro, direcao, alcanceLingua, layerSolido);
         if (hit.collider != null) { destinoLingua = hit.point; acertouParede = true; }
         else { destinoLingua = (Vector2)origemTiro + (direcao * alcanceLingua); acertouParede = false; }
     }
 
     void ProcessarFisicaLingua() {
+        
+        // TRAVA DE SEGURANÇA 1: TEMPO LIMITE
+        // Se ficar mais de 1.5s na língua (loop ou bug), corta
+        if (Time.time > tempoInicioPuxada + 1.5f) {
+            Debug.Log("Tempo limite da língua excedido. Cortando.");
+            FinalizarLingua();
+            return;
+        }
+
         switch (estadoLingua) {
             case EstadoLingua.Atirando:
                 rb.linearVelocity = Vector2.zero; 
@@ -314,21 +345,11 @@ public class PlayerController : MonoBehaviour
                 } break;
 
             case EstadoLingua.PuxandoSapo:
-                // CORREÇÃO: Verifica se tem obstáculo no caminho antes de mover
-                Vector2 direcaoPuxada = (destinoLingua - (Vector2)transform.position).normalized;
-                // Raio curto na frente do personagem (0.6f é um pouco mais que o raio do corpo)
-                RaycastHit2D obstaculo = Physics2D.Raycast(transform.position, direcaoPuxada, 0.6f, layerSolido);
-                
-                // Se bateu em algo e a distância para o destino ainda é grande (não é a parede alvo)
-                if (obstaculo.collider != null && Vector2.Distance(transform.position, destinoLingua) > 1.0f)
-                {
-                    FinalizarLingua(); // Cancela se bater num bloco no meio do caminho
-                    break;
-                }
-
+                // Move o player
                 rb.linearVelocity = Vector2.zero; 
                 transform.position = Vector2.MoveTowards(transform.position, pontaLinguaAtual, velocidadePuxadaCorpo * Time.deltaTime);
                 
+                // Se chegar no destino (a parede alvo)
                 float distDestino = Vector2.Distance(transform.position, destinoLingua);
                 if (distDestino < 0.5f) FinalizarLingua(); 
                 break;
@@ -344,10 +365,9 @@ public class PlayerController : MonoBehaviour
 
     void FinalizarLingua() { 
         estadoLingua = EstadoLingua.Pronta; 
-        rb.gravityScale = 4; 
+        rb.gravityScale = 4; // Restaura a gravidade imediatamente
+        rb.linearVelocity = Vector2.zero; // Zera inércia louca
         tempoParaProximaLingua = Time.time + delayEntreLinguadas;
-        
-        // CORREÇÃO: Língua NÃO recarrega o pulo duplo. Apenas chão.
     }
     
     void ProcessarPulo() {
