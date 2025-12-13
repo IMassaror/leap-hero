@@ -267,7 +267,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: cave_tileset_5
+      name: spike_l
       rect:
         serializedVersion: 2
         x: 48
@@ -289,7 +289,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: cave_tileset_6
+      name: spike_t
       rect:
         serializedVersion: 2
         x: 56
@@ -531,7 +531,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: cave_tileset_17
+      name: spike_b
       rect:
         serializedVersion: 2
         x: 48
@@ -553,7 +553,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: cave_tileset_18
+      name: spike_r
       rect:
         serializedVersion: 2
         x: 56
@@ -2408,8 +2408,6 @@ TextureImporter:
       cave_tileset_14: 6312211382056438666
       cave_tileset_15: 5239765187843398177
       cave_tileset_16: 3489848837463179900
-      cave_tileset_17: -1847478133570073814
-      cave_tileset_18: -2477321432101564407
       cave_tileset_19: -321007161282991147
       cave_tileset_2: 1495855589246707452
       cave_tileset_20: 936529496
@@ -2440,7 +2438,6 @@ TextureImporter:
       cave_tileset_47: 1769331697
       cave_tileset_48: -1901842655
       cave_tileset_49: 2058068827
-      cave_tileset_5: -8077325402080291620
       cave_tileset_50: 1066111676
       cave_tileset_51: -1767706294
       cave_tileset_52: -643108752
@@ -2451,7 +2448,6 @@ TextureImporter:
       cave_tileset_57: -69131747
       cave_tileset_58: 1351556009
       cave_tileset_59: 1526337248
-      cave_tileset_6: 4825128865103763961
       cave_tileset_60: -233181636
       cave_tileset_61: -2019935561
       cave_tileset_62: 2015226658
@@ -2495,6 +2491,10 @@ TextureImporter:
       cave_tileset_97: 1514537600
       cave_tileset_98: -833435382
       cave_tileset_99: 1137817642
+      spike_b: -1847478133570073814
+      spike_l: -8077325402080291620
+      spike_r: -2477321432101564407
+      spike_t: 4825128865103763961
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
