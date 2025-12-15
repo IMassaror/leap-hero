@@ -435,11 +435,11 @@ Transform:
   m_GameObject: {fileID: 374071245}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 5.04, y: -1.53, z: 0}
+  m_LocalPosition: {x: 5.55, y: -0.96999997, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 615356730}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &519420028
 GameObject:
@@ -697,6 +697,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 374071250}
   - {fileID: 1316296273}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -788,7 +789,6 @@ MonoBehaviour:
   estadoAtual: 0
   estadoLingua: 0
   excalibroScript: {fileID: 943345309}
-  visualRoot: {fileID: 374071250}
   layerSolido:
     serializedVersion: 2
     m_Bits: 64
@@ -824,7 +824,6 @@ MonoBehaviour:
   teclaLingua: 108
   lineRenderer: {fileID: 615356734}
   offsetBoca: {x: 0, y: 0, z: 0}
-  squashController: {fileID: 374071246}
   isGrounded: 0
   isTouchingWall: 0
 --- !u!120 &615356734
@@ -1914,4 +1913,3 @@ SceneRoots:
   - {fileID: 615356730}
   - {fileID: 1991820394}
   - {fileID: 943345311}
-  - {fileID: 374071250}

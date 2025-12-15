@@ -11,13 +11,7 @@ public class PlayerController : MonoBehaviour
     public EstadoLingua estadoLingua = EstadoLingua.Pronta;
 
     [Header("Conexões")]
-    public ExcalibroController excalibroScript; // ARRASTE O EXCALIBRO AQUI
-
-    [Header("Visual")]
-    public Transform visualRoot; // ARRASTE O OBJETO "Visual" AQUI
-    private Animator animVisual;
-    private SpriteRenderer srVisual;
-    private string animAtual = "";
+    public ExcalibroController excalibroScript; 
 
     [Header("Geral")]
     public LayerMask layerSolido; 
@@ -66,12 +60,11 @@ public class PlayerController : MonoBehaviour
     public LineRenderer lineRenderer;
     public Vector3 offsetBoca; 
 
-    [Header("Squash & Stretch (Visual)")]
-    public SquashStretchController squashController; // arraste o controller do visual ou será buscado automaticamente
-
     // INTERNAS
     private Rigidbody2D rb;
+    private SpriteRenderer sr;
     private BoxCollider2D colisor;
+    private Animator anim; 
     private float xInput;
     private float yInput;
     private bool jumpInputDown;
@@ -85,6 +78,10 @@ public class PlayerController : MonoBehaviour
     private bool acertouParede;          
     private float tempoParaProximaLingua;
     private Vector2 posicaoInicialTiro; 
+    
+    // VARIÁVEIS DE SEGURANÇA (NOVO)
+    private float tempoInicioPuxada; // Para evitar loops infinitos
+
     public bool isGrounded;
     public bool isTouchingWall;
     private bool isDead = false;
@@ -92,68 +89,17 @@ public class PlayerController : MonoBehaviour
     // CONTROLE DE PULO DUPLO
     private bool canDoubleJump = false; 
 
-    // terreno: para detectar aterrissagem
-    private bool prevGrounded = false;
-
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
+        sr = GetComponent<SpriteRenderer>();
         colisor = GetComponent<BoxCollider2D>();
+        anim = GetComponent<Animator>(); 
 
-        if (visualRoot != null)
-        {
-            animVisual = visualRoot.GetComponent<Animator>();
-            srVisual = visualRoot.GetComponent<SpriteRenderer>();
-        }
-
-        // tenta buscar squash automaticamente se não arrastado
-        if (squashController == null)
-            squashController = GetComponentInChildren<SquashStretchController>();
-
-        if (lineRenderer != null) lineRenderer.enabled = false;
+        if(lineRenderer != null) lineRenderer.enabled = false;
         
         TrocarEstado(Estado.Guerreiro);
-
-        prevGrounded = isGrounded;
     }
-
-    // ----------------------------
-    // SISTEMA DE SUFIXOS
-    // ----------------------------
-    string Sufixo => estadoAtual == Estado.Guerreiro ? "_h" : "_f";
-
-    bool EhTrigger(string nome)
-    {
-        // Lista das animações que NÃO devem receber sufixo (são triggers ou chamadas diretas)
-        return nome == "Attack" ||
-               nome == "AttackDown" ||
-               nome == "tongueStart" ||
-               nome == "Die" ||
-               nome == "Dash";
-    }
-
-    void PlayAnim(string nomeBase)
-    {
-        if (animVisual == null) return;
-
-        // triggers: usar SetTrigger sem sufixo
-        if (EhTrigger(nomeBase))
-        {
-            // evita retriggerar continuamente: ainda assim deixamos SetTrigger para ser chamado
-            animVisual.SetTrigger(nomeBase);
-            animAtual = nomeBase; // guarda esse estado pra evitar Play repetido em outras chamadas
-            return;
-        }
-
-        // animações que usam sufixo
-        string nome = nomeBase + Sufixo;
-
-        if (animAtual == nome) return; // evita reiniciar a animação repetidamente
-
-        animAtual = nome;
-        animVisual.Play(nome);
-    }
-    // ----------------------------
 
     void Update()
     {
@@ -166,20 +112,17 @@ public class PlayerController : MonoBehaviour
 
         if (wallJumpBlockTimer > 0) wallJumpBlockTimer -= Time.deltaTime;
 
-        // 2. SISTEMA DE PULO UNIFICADO
+        // 2. SISTEMA DE PULO
         if (estadoLingua == EstadoLingua.Pronta && Input.GetButtonDown("Jump") && !estaAtacando) 
         {
-            // Prioridade 1: Pulo do Chão
             if (isGrounded)
             {
                 jumpInputDown = true;
             }
-            // Prioridade 2: Wall Jump (Sapo na Parede e Fora do Chão)
             else if (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded)
             {
                 jumpInputDown = true;
             }
-            // Prioridade 3: Pulo Duplo (No Ar, Sapo, Tem Carga e NÃO está na parede)
             else if (estadoAtual == Estado.Sapo && canDoubleJump && excalibroScript != null)
             {
                 ExecutarPuloDuplo();
@@ -198,34 +141,36 @@ public class PlayerController : MonoBehaviour
             IniciarLingua();
         }
 
-        // 5. COMBATE GUERREIRO (Pogo)
+        // 5. COMBATE GUERREIRO
         if (estadoAtual == Estado.Guerreiro && Input.GetKeyDown(teclaAtaque) && Time.time > tempoProximoAtaque && !estaAtacando)
         {
             if (!isGrounded && yInput < -0.1f) StartCoroutine(RealizarPogo());
             else StartCoroutine(RealizarAtaque());
         }
 
-        // 6. FLIP 
+        // 6. FLIP
         if (estadoLingua == EstadoLingua.Pronta && !isTouchingWall && wallJumpBlockTimer <= 0 && !estaAtacando)
         {
              if (xInput > 0 && !viradoDireita) Flip();
              else if (xInput < 0 && viradoDireita) Flip();
         }
 
-        // 7. Crouch trigger for squash
-        if (Input.GetKeyDown(KeyCode.S))
-        {
-            if (squashController != null) squashController.DoCrouch();
-            // also play crouch anim (Crouch usa sufixo)
-            PlayAnim("Crouch");
-        }
-
-        if (Input.GetKeyUp(KeyCode.S))
-        {
-            // when released, fallback to Idle/Run handled in AtualizarAnimator
-        }
-
         AtualizarAnimator();
+    }
+
+    // --- CORREÇÃO DE BUG: COLISÃO ENQUANTO PUXA ---
+    void OnCollisionEnter2D(Collision2D collision)
+    {
+        // Se bater em qualquer coisa sólida ENQUANTO está sendo puxado
+        if (estadoLingua == EstadoLingua.PuxandoSapo)
+        {
+            // Verifica se o objeto colidido é da camada Sólida
+            if (((1 << collision.gameObject.layer) & layerSolido) != 0)
+            {
+                Debug.Log("Colisão detectada durante a puxada! Cancelando língua.");
+                FinalizarLingua();
+            }
+        }
     }
 
     public void Morrer()
@@ -234,46 +179,27 @@ public class PlayerController : MonoBehaviour
         isDead = true;
         rb.linearVelocity = Vector2.zero;
         rb.gravityScale = 1; 
-        if (animVisual != null) animVisual.SetTrigger("Die");
+        if (anim != null) anim.SetTrigger("Die");
         if (excalibroScript != null) excalibroScript.Sumir();
     }
 
     void AtualizarAnimator()
     {
-        // Se estiver atacando ou usando língua, não trocar animação
-        if (estadoLingua != EstadoLingua.Pronta)
-        {
-             PlayAnim("tongueStart");
-             return;
-        }
-
-        if (!isGrounded)
-        {
-             if (rb.linearVelocity.y > 0.1f)
-             {
-                PlayAnim("jump");
-             }
-             else if (rb.linearVelocity.y < -0.2f)
-             {
-                 PlayAnim("fall");
-             }
-             return;
-        }
-
-        // Estado em solo
-        if (Mathf.Abs(xInput) > 0.1f)
-                PlayAnim("walk");
-        else
-                PlayAnim("idle");
-
-        // Crouch handled via input (kept above)
+        if (anim == null) return;
+        anim.SetFloat("Speed", Mathf.Abs(xInput));
+        anim.SetFloat("VerticalVelocity", rb.linearVelocity.y);
+        anim.SetBool("IsGrounded", isGrounded);
+        anim.SetBool("IsSapo", estadoAtual == Estado.Sapo);
+        bool deslizando = (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded && rb.linearVelocity.y < 0);
+        anim.SetBool("IsWallSliding", deslizando);
+        anim.SetBool("IsGrappling", estadoLingua != EstadoLingua.Pronta);
     }
 
     IEnumerator RealizarPogo()
     {
         estaAtacando = true; 
         tempoProximoAtaque = Time.time + 0.2f; 
-        if (animVisual != null) animVisual.SetTrigger("AttackDown"); 
+        if (anim != null) anim.SetTrigger("AttackDown"); 
         yield return new WaitForSeconds(0.05f);
 
         Collider2D[] acertos = Physics2D.OverlapCircleAll(pontoPogo.position, raioPogo, layerInimigos);
@@ -288,8 +214,6 @@ public class PlayerController : MonoBehaviour
         {
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
             rb.AddForce(Vector2.up * forcaPogo, ForceMode2D.Impulse);
-            // jump visual
-            if (squashController != null) squashController.DoJump();
         }
         yield return new WaitForSeconds(0.1f);
         estaAtacando = false;
@@ -302,7 +226,7 @@ public class PlayerController : MonoBehaviour
         float gravidadeOriginal = rb.gravityScale;
         rb.gravityScale = 0; 
         rb.linearVelocity = Vector2.zero; 
-        if (animVisual != null) PlayAnim("attack");
+        if (anim != null) anim.SetTrigger("Attack"); 
         Collider2D[] inimigos = Physics2D.OverlapCircleAll(pontoAtaque.position, raioAtaque, layerInimigos);
         foreach (Collider2D inimigo in inimigos) Destroy(inimigo.gameObject);
         yield return new WaitForSeconds(duracaoTravamentoAereo);
@@ -318,8 +242,7 @@ public class PlayerController : MonoBehaviour
             lineRenderer.positionCount = 2; 
             Vector3 offsetReal = viradoDireita ? offsetBoca : new Vector3(-offsetBoca.x, offsetBoca.y, 0);
             lineRenderer.SetPosition(0, transform.position + offsetReal);    
-            // pontaLinguaAtual é Vector2 — convertemos para Vector3 aqui
-            lineRenderer.SetPosition(1, new Vector3(pontaLinguaAtual.x, pontaLinguaAtual.y, 0f));
+            lineRenderer.SetPosition(1, pontaLinguaAtual); 
         }
         else if(lineRenderer != null) lineRenderer.enabled = false;
     }
@@ -329,27 +252,18 @@ public class PlayerController : MonoBehaviour
         if (isDead) return;
         VerificarColisoes();
         
-        // detect landing event
-        if (!prevGrounded && isGrounded)
-        {
-            // landed
-            if (squashController != null) squashController.DoLand();
-            PlayAnim("Land"); // Land usa sufixo (Land_h / Land_f)
-        }
-
-        // RECARREGA PULO DUPLO NO CHÃO OU NA PAREDE
-        if (isGrounded || isTouchingWall)
+        if (isGrounded)
         {
             if(!canDoubleJump)
             {
-                canDoubleJump = true; // Recarrega
+                canDoubleJump = true; 
                 if(excalibroScript != null && estadoAtual == Estado.Sapo) 
-                    excalibroScript.Recarregar(); // Fica colorida dnv
+                    excalibroScript.Recarregar();
             }
         }
 
-        if (estadoLingua != EstadoLingua.Pronta) { ProcessarFisicaLingua(); prevGrounded = isGrounded; return; }
-        if (estaAtacando) { prevGrounded = isGrounded; return; }
+        if (estadoLingua != EstadoLingua.Pronta) { ProcessarFisicaLingua(); return; }
+        if (estaAtacando) return; 
 
         float velAtual = (estadoAtual == Estado.Guerreiro) ? velGuerreiro : velSapo;
         
@@ -357,8 +271,6 @@ public class PlayerController : MonoBehaviour
         else MovimentoNormal(velAtual);
 
         if (jumpInputDown) { jumpInputDown = false; ProcessarPulo(); }
-
-        prevGrounded = isGrounded;
     }
 
     void MovimentoNormal(float velAtual) {
@@ -392,84 +304,70 @@ public class PlayerController : MonoBehaviour
         int dirPulo = -ladoParede; rb.linearVelocity = Vector2.zero; 
         rb.AddForce(new Vector2(dirPulo * forcaWallJumpX, forcaWallJumpY), ForceMode2D.Impulse);
         if (dirPulo == 1 && !viradoDireita) Flip(); else if (dirPulo == -1 && viradoDireita) Flip();
-        
-        // Wall Jump recarrega o pulo duplo
-        canDoubleJump = true; 
-        if(excalibroScript != null) excalibroScript.Recarregar();
-
-        // squash visual
-        if (squashController != null) squashController.DoWallJump();
     }
 
     void IniciarLingua() {
         Vector2 direcao = viradoDireita ? Vector2.right : Vector2.left;
         estadoLingua = EstadoLingua.Atirando; 
-        if (animVisual != null) animVisual.SetTrigger("TongueShoot");
-        rb.gravityScale = 0; rb.linearVelocity = Vector2.zero;
-
-        // posicaoInicialTiro é Vector2 — convertemos explicitamente
-        posicaoInicialTiro = (Vector2)transform.position;
-
+        if(anim != null) anim.SetTrigger("TongueShoot");
+        
+        rb.gravityScale = 0; 
+        rb.linearVelocity = Vector2.zero;
+        
+        // Timer de segurança (NOVO)
+        tempoInicioPuxada = Time.time; 
+        
+        posicaoInicialTiro = transform.position;
         Vector3 offsetReal = viradoDireita ? offsetBoca : new Vector3(-offsetBoca.x, offsetBoca.y, 0);
-        Vector3 origemTiro = transform.position + offsetReal;
-        pontaLinguaAtual = (Vector2)origemTiro; 
-
+        Vector3 origemTiro = transform.position + offsetReal; pontaLinguaAtual = origemTiro; 
+        
         RaycastHit2D hit = Physics2D.Raycast(origemTiro, direcao, alcanceLingua, layerSolido);
         if (hit.collider != null) { destinoLingua = hit.point; acertouParede = true; }
         else { destinoLingua = (Vector2)origemTiro + (direcao * alcanceLingua); acertouParede = false; }
     }
 
     void ProcessarFisicaLingua() {
+        
+        // TRAVA DE SEGURANÇA 1: TEMPO LIMITE
+        // Se ficar mais de 1.5s na língua (loop ou bug), corta
+        if (Time.time > tempoInicioPuxada + 1.5f) {
+            Debug.Log("Tempo limite da língua excedido. Cortando.");
+            FinalizarLingua();
+            return;
+        }
+
         switch (estadoLingua) {
             case EstadoLingua.Atirando:
                 rb.linearVelocity = Vector2.zero; 
                 pontaLinguaAtual = Vector2.MoveTowards(pontaLinguaAtual, destinoLingua, velocidadeLinguaIda * Time.deltaTime);
                 if (Vector2.Distance(pontaLinguaAtual, destinoLingua) < 0.1f) {
-                    if (acertouParede) {
-                        estadoLingua = EstadoLingua.PuxandoSapo;
-                        // quando virou para puxar, consideramos isso o "dash" — toca squash dash
-                        if (squashController != null) squashController.DoDash();
-                        PlayAnim("Dash"); // Dash é trigger (sem sufixo)
-                    }
-                    else { estadoLingua = EstadoLingua.Retraindo; }
+                    if (acertouParede) estadoLingua = EstadoLingua.PuxandoSapo; else estadoLingua = EstadoLingua.Retraindo;
                 } break;
+
             case EstadoLingua.PuxandoSapo:
-                // Converter transform.position para Vector2 explicitamente antes de usar Vector2.Distance / MoveTowards
-                float distOrigem = Vector2.Distance((Vector2)transform.position, posicaoInicialTiro);
-                float distDestino = Vector2.Distance((Vector2)transform.position, destinoLingua);
-                if (distOrigem > 0.5f) {
-                    Collider2D col = Physics2D.OverlapCircle(transform.position, 0.5f, layerSolido);
-                    if (col != null && distDestino > 1.0f) { estadoLingua = EstadoLingua.Retraindo; rb.gravityScale = 4; rb.linearVelocity = Vector2.zero; break; }
-                }
-
-                rb.linearVelocity = Vector2.zero;
-
-                // MoveTowards em Vector2 -> converter depois para Vector3 ao atribuir a transform.position
-                Vector2 newPos2 = Vector2.MoveTowards((Vector2)transform.position, pontaLinguaAtual, velocidadePuxadaCorpo * Time.deltaTime);
-                transform.position = new Vector3(newPos2.x, newPos2.y, transform.position.z);
-
-                if (Vector2.Distance((Vector2)transform.position, destinoLingua) < 0.5f) FinalizarLingua();
+                // Move o player
+                rb.linearVelocity = Vector2.zero; 
+                transform.position = Vector2.MoveTowards(transform.position, pontaLinguaAtual, velocidadePuxadaCorpo * Time.deltaTime);
+                
+                // Se chegar no destino (a parede alvo)
+                float distDestino = Vector2.Distance(transform.position, destinoLingua);
+                if (distDestino < 0.5f) FinalizarLingua(); 
                 break;
+
             case EstadoLingua.Retraindo:
                 if (rb.gravityScale == 0) rb.linearVelocity = Vector2.zero;
                 Vector3 offsetReal = viradoDireita ? offsetBoca : new Vector3(-offsetBoca.x, offsetBoca.y, 0);
                 Vector3 alvoRetracao = transform.position + offsetReal;
-
-                // pontaLinguaAtual é Vector2, alvoRetracao é Vector3 -> convertemos alvo para Vector2
-                Vector2 alvo2 = (Vector2)alvoRetracao;
-
-                pontaLinguaAtual = Vector2.MoveTowards(pontaLinguaAtual, alvo2, velocidadeLinguaVolta * Time.deltaTime);
-                if (Vector2.Distance(pontaLinguaAtual, alvo2) < 0.1f) FinalizarLingua();
-                break;
+                pontaLinguaAtual = Vector2.MoveTowards(pontaLinguaAtual, alvoRetracao, velocidadeLinguaVolta * Time.deltaTime);
+                if (Vector2.Distance(pontaLinguaAtual, alvoRetracao) < 0.1f) FinalizarLingua(); break;
         }
     }
 
     void FinalizarLingua() { 
         estadoLingua = EstadoLingua.Pronta; 
-        rb.gravityScale = 4; 
+        rb.gravityScale = 4; // Restaura a gravidade imediatamente
+        rb.linearVelocity = Vector2.zero; // Zera inércia louca
         tempoParaProximaLingua = Time.time + delayEntreLinguadas;
-        canDoubleJump = true; 
-        if(excalibroScript != null) excalibroScript.Recarregar();
     }
     
     void ProcessarPulo() {
@@ -487,26 +385,13 @@ public class PlayerController : MonoBehaviour
     void ExecutarPuloDuplo()
     {
         canDoubleJump = false; 
-        
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
         rb.AddForce(Vector2.up * puloSapo, ForceMode2D.Impulse);
-
-        // AVISA A ESPADA QUE GASTOU
         if(excalibroScript != null) excalibroScript.UsarPulo();
-
-        // squash visual para double jump
-        if (squashController != null) squashController.DoJump();
-
         Debug.Log("Excalibro Jump!");
     }
 
-    void ExecutarPulo(float forca) { 
-        rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0); 
-        rb.AddForce(Vector2.up * forca, ForceMode2D.Impulse);
-
-        // squash visual no pulo
-        if (squashController != null) squashController.DoJump();
-    }
+    void ExecutarPulo(float forca) { rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0); rb.AddForce(Vector2.up * forca, ForceMode2D.Impulse); }
 
     void VerificarColisoes() {
         float margem = 0.05f; Bounds b = colisor.bounds;
@@ -517,21 +402,12 @@ public class PlayerController : MonoBehaviour
         if (paredeDir) { isTouchingWall = true; ladoParede = 1; } else if (paredeEsq) { isTouchingWall = true; ladoParede = -1; } else { isTouchingWall = false; ladoParede = 0; }
     }
 
-    void Flip() 
-    {
-        viradoDireita = !viradoDireita;
-
-        if (visualRoot != null)
-        {
-            Vector3 escala = visualRoot.localScale;
-            escala.x *= -1;
-            visualRoot.localScale = escala;
-        }
-    }
+    void Flip() { viradoDireita = !viradoDireita; Vector3 escala = transform.localScale; escala.x *= -1; transform.localScale = escala; }
 
     void TrocarEstado(Estado novo) { 
         estadoAtual = novo; 
-         if (srVisual != null) srVisual.color = Color.white;
+        sr.color = (estadoAtual == Estado.Guerreiro) ? corGuerreiro : corSapo; 
+        if(anim != null) anim.SetBool("IsSapo", estadoAtual == Estado.Sapo);
         
         if(excalibroScript != null)
         {
