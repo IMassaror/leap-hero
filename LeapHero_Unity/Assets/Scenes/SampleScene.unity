@@ -131,6 +131,7 @@ GameObject:
   - component: {fileID: 374071249}
   - component: {fileID: 374071247}
   - component: {fileID: 374071246}
+  - component: {fileID: 374071251}
   m_Layer: 0
   m_Name: PlayerSprite
   m_TagString: Untagged
@@ -418,6 +419,28 @@ Transform:
   m_Children: []
   m_Father: {fileID: 615356730}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!95 &374071251
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 374071245}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 03c771131d152984ba38c2f603e38f1e, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -517,10 +540,10 @@ Camera:
   m_LensShift: {x: 0, y: 0}
   m_NormalizedViewPortRect:
     serializedVersion: 2
-    x: 0
-    y: 0.121951215
-    width: 0.54099745
-    height: 0.7317073
+    x: 0.11245466
+    y: 0.069212414
+    width: 0.77388155
+    height: 0.85918856
   near clip plane: 0.3
   far clip plane: 1000
   field of view: 34
@@ -801,6 +824,8 @@ MonoBehaviour:
   teclaLingua: 108
   lineRenderer: {fileID: 615356734}
   offsetBoca: {x: 0, y: 0, z: 0}
+  stretch: {fileID: 0}
+  prevGrounded: 0
   isGrounded: 0
   isTouchingWall: 0
 --- !u!120 &615356734

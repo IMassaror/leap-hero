@@ -60,6 +60,9 @@ public class PlayerController : MonoBehaviour
     public LineRenderer lineRenderer;
     public Vector3 offsetBoca; 
 
+    // Squash and Stretch Controller
+    public SquashStretchController stretch;
+
     // INTERNAS
     private Rigidbody2D rb;
     private SpriteRenderer sr;
@@ -95,6 +98,7 @@ public class PlayerController : MonoBehaviour
         sr = GetComponent<SpriteRenderer>();
         colisor = GetComponent<BoxCollider2D>();
         anim = GetComponent<Animator>(); 
+        stretch = GetComponentInChildren<SquashStretchController>();
 
         if(lineRenderer != null) lineRenderer.enabled = false;
         
@@ -395,6 +399,7 @@ public class PlayerController : MonoBehaviour
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0); 
         rb.AddForce(Vector2.up * forca, ForceMode2D.Impulse); 
         anim.SetBool("IsJumping", true);
+        stretch.DoJump();
         }
 
     void VerificarColisoes() {
@@ -407,6 +412,7 @@ public class PlayerController : MonoBehaviour
         if (isGrounded) anim.SetBool("IsJumping", !isGrounded);
         if (!prevGrounded && isGrounded){
             anim.SetTrigger("Land");
+            stretch.DoLand();
         }
         prevGrounded = isGrounded;
     }
