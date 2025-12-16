@@ -81,7 +81,7 @@ public class PlayerController : MonoBehaviour
     
     // VARIÁVEIS DE SEGURANÇA (NOVO)
     private float tempoInicioPuxada; // Para evitar loops infinitos
-
+    public bool prevGrounded;
     public bool isGrounded;
     public bool isTouchingWall;
     private bool isDead = false;
@@ -270,7 +270,7 @@ public class PlayerController : MonoBehaviour
         if (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded) MecanicaDeParedeoSapo();
         else MovimentoNormal(velAtual);
 
-        if (jumpInputDown) { jumpInputDown = false; ProcessarPulo(); }
+        if (jumpInputDown) { jumpInputDown = false; isGrounded = false; ProcessarPulo(); }
     }
 
     void MovimentoNormal(float velAtual) {
@@ -391,7 +391,11 @@ public class PlayerController : MonoBehaviour
         Debug.Log("Excalibro Jump!");
     }
 
-    void ExecutarPulo(float forca) { rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0); rb.AddForce(Vector2.up * forca, ForceMode2D.Impulse); }
+    void ExecutarPulo(float forca) { 
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0); 
+        rb.AddForce(Vector2.up * forca, ForceMode2D.Impulse); 
+        anim.SetBool("IsJumping", true);
+        }
 
     void VerificarColisoes() {
         float margem = 0.05f; Bounds b = colisor.bounds;
@@ -400,6 +404,11 @@ public class PlayerController : MonoBehaviour
         bool paredeDir = Physics2D.BoxCast(b.center, tamanhoSensorParede, 0f, Vector2.right, margem, layerSolido);
         bool paredeEsq = Physics2D.BoxCast(b.center, tamanhoSensorParede, 0f, Vector2.left, margem, layerSolido);
         if (paredeDir) { isTouchingWall = true; ladoParede = 1; } else if (paredeEsq) { isTouchingWall = true; ladoParede = -1; } else { isTouchingWall = false; ladoParede = 0; }
+        if (isGrounded) anim.SetBool("IsJumping", !isGrounded);
+        if (!prevGrounded && isGrounded){
+            anim.SetTrigger("Land");
+        }
+        prevGrounded = isGrounded;
     }
 
     void Flip() { viradoDireita = !viradoDireita; Vector3 escala = transform.localScale; escala.x *= -1; transform.localScale = escala; }
