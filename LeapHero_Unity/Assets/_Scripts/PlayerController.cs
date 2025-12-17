@@ -3,441 +3,631 @@ using System.Collections;
 
 public class PlayerController : MonoBehaviour
 {
-    // --- ENUMS ---
-    public enum Estado { Guerreiro, Sapo }
-    public Estado estadoAtual;
+    #region Enums & States
+    // --- ESTADOS DO JOGADOR ---
+    public enum PlayerState { Warrior, Frog }
+    public PlayerState currentState;
+
+    // --- ESTADOS DA LÍNGUA ---
+    public enum TongueState { Ready, Shooting, Pulling, Retracting }
+    public TongueState currentTongueState = TongueState.Ready;
+    #endregion
+
+    #region Inspector Variables
+
+    [Header("Dependencies")]
+    public ExcalibroController excalibroController; // Referência ao script da espada
+    public LineRenderer lineRenderer; // Linha visual da língua
+
+    [Header("General Settings")]
+    public LayerMask groundLayer; // Camada do chão/paredes
+
+    [Header("Warrior Settings")]
+    public float warriorSpeed = 4f;
+    public float warriorJumpForce = 12f;
+    public Color warriorColor = Color.white;
     
-    public enum EstadoLingua { Pronta, Atirando, PuxandoSapo, Retraindo }
-    public EstadoLingua estadoLingua = EstadoLingua.Pronta;
+    [Header("Warrior - Combat")]
+    public KeyCode attackKey = KeyCode.J;
+    public Transform attackPoint;       // Ponto de origem do ataque frontal
+    public float attackRadius = 0.8f;   // Tamanho da área de dano
+    public LayerMask enemyLayer;        // O que o jogador pode bater
+    public float airStallDuration = 0.3f; // Tempo que ele para no ar ao bater
+    public float attackCooldown = 0.4f;
+    
+    [Header("Warrior - Pogo Mechanics")]
+    public float pogoForce = 14f;       // Força do pulo ao bater pra baixo
+    public Transform pogoPoint;         // Ponto de colisão do ataque pra baixo
+    public float pogoRadius = 0.6f;
 
-    [Header("Conexões")]
-    public ExcalibroController excalibroScript; 
+    [Header("Frog Settings")]
+    public float frogSpeed = 7f;
+    public float frogJumpForce = 15f;
+    public Color frogColor = Color.green;
 
-    [Header("Geral")]
-    public LayerMask layerSolido; 
+    [Header("Frog - Wall Mechanics")]
+    public float wallJumpForceX = 12f;
+    public float wallJumpForceY = 16f;
+    public float wallSlideSpeed = 2f;        // Velocidade deslizando
+    public float wallClimbSpeed = 3f;        // Velocidade subindo/descendo (ajuste)
+    public float wallStickTime = 1.5f;       // Tempo que aguenta grudado
+    public float wallJumpBlockDuration = 0.2f; // Tempo sem controle após walljump
+    public float wallDetachDelay = 0.2f;     // Tempo segurando contra a parede pra desgrudar
 
-    [Header("Guerreiro - Movimento")]
-    public float velGuerreiro = 4f;
-    public float puloGuerreiro = 12f;
-    public Color corGuerreiro = Color.white;
+    [Header("Frog - Tongue Mechanics")]
+    public KeyCode tongueKey = KeyCode.L;
+    public float tongueRange = 8f;
+    public float tongueShootSpeed = 25f;     // Velocidade da ponta indo
+    public float tongueRetractSpeed = 35f;   // Velocidade da ponta voltando (errou)
+    public float tonguePullSpeed = 18f;      // Velocidade do corpo sendo puxado
+    public float tongueCooldown = 0.5f;
+    public Vector3 mouthOffset;              // Posição da boca em relação ao centro
 
-    [Header("Guerreiro - Combate")]
-    public KeyCode teclaAtaque = KeyCode.J;
-    public Transform pontoAtaque; 
-    public float raioAtaque = 0.8f; 
-    public LayerMask layerInimigos; 
-    public float duracaoTravamentoAereo = 0.3f; 
-    public float cooldownAtaque = 0.4f; 
-    private float tempoProximoAtaque;
-    private bool estaAtacando = false; 
+    #endregion
 
-    [Header("Guerreiro - Excalibur (Pogo)")]
-    public float forcaPogo = 14f; 
-    public Transform pontoPogo;   
-    public float raioPogo = 0.6f;
-
-    [Header("Sapo - Movimento")]
-    public float velSapo = 7f;
-    public float puloSapo = 15f;
-    public Color corSapo = Color.green;
-
-    [Header("Sapo - Wall Mechanics")]
-    public float forcaWallJumpX = 12f; 
-    public float forcaWallJumpY = 16f;
-    public float velocidadeDeslizar = 2f; 
-    public float velocidadeAjusteVertical = 3f; 
-    public float tempoGrudadoNaParede = 1.5f; 
-    public float tempoBloqueioWallJump = 0.2f; 
-    public float tempoResistenciaParede = 0.2f; 
-
-    [Header("Sapo - Língua")]
-    public float alcanceLingua = 8f;
-    public float velocidadeLinguaIda = 25f;    
-    public float velocidadeLinguaVolta = 35f; 
-    public float velocidadePuxadaCorpo = 18f; 
-    public float delayEntreLinguadas = 0.5f; 
-    public KeyCode teclaLingua = KeyCode.L; 
-    public LineRenderer lineRenderer;
-    public Vector3 offsetBoca; 
-
-    // Squash and Stretch Controller
-    public SquashStretchController stretch;
-
-    // INTERNAS
+    #region Private Variables
+    // Componentes Internos
     private Rigidbody2D rb;
     private SpriteRenderer sr;
-    private BoxCollider2D colisor;
-    private Animator anim; 
-    private float xInput;
-    private float yInput;
-    private bool jumpInputDown;
-    private bool viradoDireita = true;
-    private float wallStickTimer; 
-    private float wallJumpBlockTimer; 
-    private float timerTentativaSair; 
-    private int ladoParede = 0;
-    private Vector2 destinoLingua;       
-    private Vector2 pontaLinguaAtual;    
-    private bool acertouParede;          
-    private float tempoParaProximaLingua;
-    private Vector2 posicaoInicialTiro; 
-    
-    // VARIÁVEIS DE SEGURANÇA (NOVO)
-    private float tempoInicioPuxada; // Para evitar loops infinitos
-    public bool prevGrounded;
+    private BoxCollider2D boxCollider;
+    private Animator anim;
+
+    // Inputs e Controle
+    private float moveInputX;
+    private float moveInputY;
+    private bool jumpInputPressed;
+    private bool isFacingRight = true;
+    private bool isAttacking = false;
+
+    // Timers
+    private float nextAttackTime;
+    private float wallStickTimer;
+    private float wallJumpBlockTimer;
+    private float wallDetachTimer;
+    private float nextTongueTime;
+    private float tongueStartTime; // Segurança para não travar na língua
+
+    // Controle de Parede
+    private int wallDirection = 0; // 1 = Direita, -1 = Esquerda, 0 = Nenhuma
+
+    // Controle da Língua
+    private Vector2 tongueTargetPos;
+    private Vector2 currentTongueTipPos;
+    private bool hasHitWall;
+
+    // Flags de Estado
     public bool isGrounded;
     public bool isTouchingWall;
     private bool isDead = false;
+    private bool canDoubleJump = false; // Controle da Excalibro
+    #endregion
 
-    // CONTROLE DE PULO DUPLO
-    private bool canDoubleJump = false; 
-
+    #region Unity Callbacks
     void Start()
     {
+        // Pega as referências automaticamente
         rb = GetComponent<Rigidbody2D>();
         sr = GetComponent<SpriteRenderer>();
-        colisor = GetComponent<BoxCollider2D>();
-        anim = GetComponent<Animator>(); 
-        stretch = GetComponentInChildren<SquashStretchController>();
+        boxCollider = GetComponent<BoxCollider2D>();
+        anim = GetComponent<Animator>();
 
-        if(lineRenderer != null) lineRenderer.enabled = false;
-        
-        TrocarEstado(Estado.Guerreiro);
+        if (lineRenderer != null) lineRenderer.enabled = false;
+
+        // Inicia como Guerreiro por padrão
+        SwitchState(PlayerState.Warrior);
     }
 
     void Update()
     {
         if (isDead) return;
 
-        // 1. INPUTS
-        if (estaAtacando) xInput = 0;
-        else xInput = Input.GetAxisRaw("Horizontal");
-        yInput = Input.GetAxisRaw("Vertical");
-
-        if (wallJumpBlockTimer > 0) wallJumpBlockTimer -= Time.deltaTime;
-
-        // 2. SISTEMA DE PULO
-        if (estadoLingua == EstadoLingua.Pronta && Input.GetButtonDown("Jump") && !estaAtacando) 
-        {
-            if (isGrounded)
-            {
-                jumpInputDown = true;
-            }
-            else if (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded)
-            {
-                jumpInputDown = true;
-            }
-            else if (estadoAtual == Estado.Sapo && canDoubleJump && excalibroScript != null)
-            {
-                ExecutarPuloDuplo();
-            }
-        }
-
-        // 3. TROCA DE ESTADO
-        if (Input.GetKeyDown(KeyCode.C) && !estaAtacando) 
-            TrocarEstado(estadoAtual == Estado.Guerreiro ? Estado.Sapo : Estado.Guerreiro);
-
-        // 4. LÍNGUA
-        if (estadoAtual == Estado.Sapo && estadoLingua == EstadoLingua.Pronta && Input.GetKeyDown(teclaLingua) && Time.time > tempoParaProximaLingua) 
-        {
-            if (xInput > 0 && !viradoDireita) Flip();
-            else if (xInput < 0 && viradoDireita) Flip();
-            IniciarLingua();
-        }
-
-        // 5. COMBATE GUERREIRO
-        if (estadoAtual == Estado.Guerreiro && Input.GetKeyDown(teclaAtaque) && Time.time > tempoProximoAtaque && !estaAtacando)
-        {
-            if (!isGrounded && yInput < -0.1f) StartCoroutine(RealizarPogo());
-            else StartCoroutine(RealizarAtaque());
-        }
-
-        // 6. FLIP
-        if (estadoLingua == EstadoLingua.Pronta && !isTouchingWall && wallJumpBlockTimer <= 0 && !estaAtacando)
-        {
-             if (xInput > 0 && !viradoDireita) Flip();
-             else if (xInput < 0 && viradoDireita) Flip();
-        }
-
-        AtualizarAnimator();
-    }
-
-    // --- CORREÇÃO DE BUG: COLISÃO ENQUANTO PUXA ---
-    void OnCollisionEnter2D(Collision2D collision)
-    {
-        // Se bater em qualquer coisa sólida ENQUANTO está sendo puxado
-        if (estadoLingua == EstadoLingua.PuxandoSapo)
-        {
-            // Verifica se o objeto colidido é da camada Sólida
-            if (((1 << collision.gameObject.layer) & layerSolido) != 0)
-            {
-                Debug.Log("Colisão detectada durante a puxada! Cancelando língua.");
-                FinalizarLingua();
-            }
-        }
-    }
-
-    public void Morrer()
-    {
-        if (isDead) return;
-        isDead = true;
-        rb.linearVelocity = Vector2.zero;
-        rb.gravityScale = 1; 
-        if (anim != null) anim.SetTrigger("Die");
-        if (excalibroScript != null) excalibroScript.Sumir();
-    }
-
-    void AtualizarAnimator()
-    {
-        if (anim == null) return;
-        anim.SetFloat("Speed", Mathf.Abs(xInput));
-        anim.SetFloat("VerticalVelocity", rb.linearVelocity.y);
-        anim.SetBool("IsGrounded", isGrounded);
-        anim.SetBool("IsSapo", estadoAtual == Estado.Sapo);
-        bool deslizando = (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded && rb.linearVelocity.y < 0);
-        anim.SetBool("IsWallSliding", deslizando);
-        anim.SetBool("IsGrappling", estadoLingua != EstadoLingua.Pronta);
-    }
-
-    IEnumerator RealizarPogo()
-    {
-        estaAtacando = true; 
-        tempoProximoAtaque = Time.time + 0.2f; 
-        if (anim != null) anim.SetTrigger("AttackDown"); 
-        yield return new WaitForSeconds(0.05f);
-
-        Collider2D[] acertos = Physics2D.OverlapCircleAll(pontoPogo.position, raioPogo, layerInimigos);
-        bool acertouAlgo = false;
-        foreach (Collider2D alvo in acertos)
-        {
-            Destroy(alvo.gameObject); 
-            acertouAlgo = true;
-        }
-
-        if (acertouAlgo)
-        {
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
-            rb.AddForce(Vector2.up * forcaPogo, ForceMode2D.Impulse);
-        }
-        yield return new WaitForSeconds(0.1f);
-        estaAtacando = false;
-    }
-
-    IEnumerator RealizarAtaque()
-    {
-        estaAtacando = true;
-        tempoProximoAtaque = Time.time + cooldownAtaque;
-        float gravidadeOriginal = rb.gravityScale;
-        rb.gravityScale = 0; 
-        rb.linearVelocity = Vector2.zero; 
-        if (anim != null) anim.SetTrigger("Attack"); 
-        Collider2D[] inimigos = Physics2D.OverlapCircleAll(pontoAtaque.position, raioAtaque, layerInimigos);
-        foreach (Collider2D inimigo in inimigos) Destroy(inimigo.gameObject);
-        yield return new WaitForSeconds(duracaoTravamentoAereo);
-        rb.gravityScale = gravidadeOriginal; 
-        estaAtacando = false;
-    }
-
-    void LateUpdate()
-    {
-        if (lineRenderer != null && estadoLingua != EstadoLingua.Pronta)
-        {
-            lineRenderer.enabled = true;
-            lineRenderer.positionCount = 2; 
-            Vector3 offsetReal = viradoDireita ? offsetBoca : new Vector3(-offsetBoca.x, offsetBoca.y, 0);
-            lineRenderer.SetPosition(0, transform.position + offsetReal);    
-            lineRenderer.SetPosition(1, pontaLinguaAtual); 
-        }
-        else if(lineRenderer != null) lineRenderer.enabled = false;
+        HandleInput();
+        HandleStateSwitch();
+        HandleActions();
+        UpdateAnimations();
     }
 
     void FixedUpdate()
     {
         if (isDead) return;
-        VerificarColisoes();
-        
-        if (isGrounded)
+
+        CheckCollisions();
+        HandleGroundLogic();
+
+        // Prioridade para a física da língua
+        if (currentTongueState != TongueState.Ready)
         {
-            if(!canDoubleJump)
-            {
-                canDoubleJump = true; 
-                if(excalibroScript != null && estadoAtual == Estado.Sapo) 
-                    excalibroScript.Recarregar();
-            }
-        }
-
-        if (estadoLingua != EstadoLingua.Pronta) { ProcessarFisicaLingua(); return; }
-        if (estaAtacando) return; 
-
-        float velAtual = (estadoAtual == Estado.Guerreiro) ? velGuerreiro : velSapo;
-        
-        if (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded) MecanicaDeParedeoSapo();
-        else MovimentoNormal(velAtual);
-
-        if (jumpInputDown) { jumpInputDown = false; isGrounded = false; ProcessarPulo(); }
-    }
-
-    void MovimentoNormal(float velAtual) {
-        rb.gravityScale = 4; wallStickTimer = tempoGrudadoNaParede; timerTentativaSair = 0;
-        if (wallJumpBlockTimer <= 0) rb.linearVelocity = new Vector2(xInput * velAtual, rb.linearVelocity.y);
-    }
-
-    void MecanicaDeParedeoSapo() {
-        if (wallJumpBlockTimer > 0) return;
-        bool tentandoSair = (xInput != 0 && xInput != ladoParede);
-        if (tentandoSair) timerTentativaSair += Time.deltaTime; else timerTentativaSair = 0;
-
-        if (tentandoSair && timerTentativaSair > tempoResistenciaParede) {
-            rb.gravityScale = 4; rb.linearVelocity = new Vector2(xInput * velSapo, rb.linearVelocity.y); return;
-        }
-        rb.linearVelocity = new Vector2(0, rb.linearVelocity.y); 
-        if (wallStickTimer > 0) {
-            rb.gravityScale = 0;
-            if (yInput < 0) rb.linearVelocity = new Vector2(0, -velocidadeAjusteVertical); else rb.linearVelocity = Vector2.zero; 
-            wallStickTimer -= Time.deltaTime;
-            if (ladoParede == 1 && viradoDireita) Flip(); else if (ladoParede == -1 && !viradoDireita) Flip();
-        } else {
-            rb.gravityScale = 4; 
-            float velQueda = (yInput < 0) ? velocidadeAjusteVertical : velocidadeDeslizar;
-            rb.linearVelocity = new Vector2(0, Mathf.Clamp(rb.linearVelocity.y, -velQueda, float.MaxValue));
-        }
-    }
-
-    void RealizarWallJump() {
-        wallStickTimer = tempoGrudadoNaParede; wallJumpBlockTimer = tempoBloqueioWallJump; timerTentativaSair = 0; 
-        int dirPulo = -ladoParede; rb.linearVelocity = Vector2.zero; 
-        rb.AddForce(new Vector2(dirPulo * forcaWallJumpX, forcaWallJumpY), ForceMode2D.Impulse);
-        if (dirPulo == 1 && !viradoDireita) Flip(); else if (dirPulo == -1 && viradoDireita) Flip();
-    }
-
-    void IniciarLingua() {
-        Vector2 direcao = viradoDireita ? Vector2.right : Vector2.left;
-        estadoLingua = EstadoLingua.Atirando; 
-        if(anim != null) anim.SetTrigger("TongueShoot");
-        
-        rb.gravityScale = 0; 
-        rb.linearVelocity = Vector2.zero;
-        
-        // Timer de segurança (NOVO)
-        tempoInicioPuxada = Time.time; 
-        
-        posicaoInicialTiro = transform.position;
-        Vector3 offsetReal = viradoDireita ? offsetBoca : new Vector3(-offsetBoca.x, offsetBoca.y, 0);
-        Vector3 origemTiro = transform.position + offsetReal; pontaLinguaAtual = origemTiro; 
-        
-        RaycastHit2D hit = Physics2D.Raycast(origemTiro, direcao, alcanceLingua, layerSolido);
-        if (hit.collider != null) { destinoLingua = hit.point; acertouParede = true; }
-        else { destinoLingua = (Vector2)origemTiro + (direcao * alcanceLingua); acertouParede = false; }
-    }
-
-    void ProcessarFisicaLingua() {
-        
-        // TRAVA DE SEGURANÇA 1: TEMPO LIMITE
-        // Se ficar mais de 1.5s na língua (loop ou bug), corta
-        if (Time.time > tempoInicioPuxada + 1.5f) {
-            Debug.Log("Tempo limite da língua excedido. Cortando.");
-            FinalizarLingua();
+            HandleTonguePhysics();
             return;
         }
 
-        switch (estadoLingua) {
-            case EstadoLingua.Atirando:
-                rb.linearVelocity = Vector2.zero; 
-                pontaLinguaAtual = Vector2.MoveTowards(pontaLinguaAtual, destinoLingua, velocidadeLinguaIda * Time.deltaTime);
-                if (Vector2.Distance(pontaLinguaAtual, destinoLingua) < 0.1f) {
-                    if (acertouParede) estadoLingua = EstadoLingua.PuxandoSapo; else estadoLingua = EstadoLingua.Retraindo;
-                } break;
+        if (isAttacking) return; // Se ataca, não move
 
-            case EstadoLingua.PuxandoSapo:
-                // Move o player
-                rb.linearVelocity = Vector2.zero; 
-                transform.position = Vector2.MoveTowards(transform.position, pontaLinguaAtual, velocidadePuxadaCorpo * Time.deltaTime);
+        // Seleciona velocidade baseada na forma atual
+        float currentSpeed = (currentState == PlayerState.Warrior) ? warriorSpeed : frogSpeed;
+
+        // Lógica de movimento
+        if (currentState == PlayerState.Frog && isTouchingWall && !isGrounded)
+        {
+            HandleFrogWallLogic();
+        }
+        else
+        {
+            HandleNormalMovement(currentSpeed);
+        }
+
+        // Processa pulo (se houve input no Update)
+        if (jumpInputPressed)
+        {
+            jumpInputPressed = false;
+            HandleJump();
+        }
+    }
+
+    void LateUpdate()
+    {
+        // Desenha a linha da língua DEPOIS de tudo calculado (evita atraso visual)
+        DrawTongue();
+    }
+
+    // --- CORREÇÃO DE BUG (SOFTLOCK DA LÍNGUA) ---
+    void OnCollisionEnter2D(Collision2D collision)
+    {
+        // Se bater em parede sólida enquanto é puxado -> Cancela para não travar
+        if (currentTongueState == TongueState.Pulling)
+        {
+            if (((1 << collision.gameObject.layer) & groundLayer) != 0)
+            {
+                Debug.Log("Collision during tongue pull. Resetting.");
+                StopTongue();
+            }
+        }
+    }
+    #endregion
+
+    #region Input & Actions
+    void HandleInput()
+    {
+        // Se estiver atacando, trava movimento horizontal
+        if (isAttacking) moveInputX = 0;
+        else moveInputX = Input.GetAxisRaw("Horizontal");
+
+        moveInputY = Input.GetAxisRaw("Vertical");
+
+        // Timer do bloqueio de walljump
+        if (wallJumpBlockTimer > 0) wallJumpBlockTimer -= Time.deltaTime;
+
+        // Input de Pulo
+        if (currentTongueState == TongueState.Ready && Input.GetButtonDown("Jump") && !isAttacking)
+        {
+            // Pulo normal (chão)
+            if (isGrounded)
+            {
+                jumpInputPressed = true;
+            }
+            // Pulo na parede (Sapo)
+            else if (currentState == PlayerState.Frog && isTouchingWall && !isGrounded)
+            {
+                jumpInputPressed = true;
+            }
+            // Pulo duplo (Excalibro)
+            else if (currentState == PlayerState.Frog && canDoubleJump && excalibroController != null)
+            {
+                PerformDoubleJump();
+            }
+        }
+    }
+
+    void HandleActions()
+    {
+        // Input da Língua (Sapo)
+        if (currentState == PlayerState.Frog && currentTongueState == TongueState.Ready && Input.GetKeyDown(tongueKey) && Time.time > nextTongueTime)
+        {
+            // Corrige a direção antes de atirar
+            if (moveInputX > 0 && !isFacingRight) Flip();
+            else if (moveInputX < 0 && isFacingRight) Flip();
+            
+            StartTongue();
+        }
+
+        // Input de Ataque (Guerreiro)
+        if (currentState == PlayerState.Warrior && Input.GetKeyDown(attackKey) && Time.time > nextAttackTime && !isAttacking)
+        {
+            // Ataque para baixo (Pogo) ou Ataque Normal
+            if (!isGrounded && moveInputY < -0.1f) StartCoroutine(PerformPogoAttack());
+            else StartCoroutine(PerformNormalAttack());
+        }
+
+        // Virar o personagem (Flip)
+        if (currentTongueState == TongueState.Ready && !isTouchingWall && wallJumpBlockTimer <= 0 && !isAttacking)
+        {
+            if (moveInputX > 0 && !isFacingRight) Flip();
+            else if (moveInputX < 0 && isFacingRight) Flip();
+        }
+    }
+
+    void HandleStateSwitch()
+    {
+        if (Input.GetKeyDown(KeyCode.C) && !isAttacking)
+        {
+            SwitchState(currentState == PlayerState.Warrior ? PlayerState.Frog : PlayerState.Warrior);
+        }
+    }
+    #endregion
+
+    #region Movement Logic
+    void HandleNormalMovement(float speed)
+    {
+        rb.gravityScale = 4; // Garante gravidade normal
+        wallStickTimer = wallStickTime;
+        wallDetachTimer = 0;
+
+        if (wallJumpBlockTimer <= 0)
+        {
+            // Unity 6 usa linearVelocity (substituindo o antigo velocity)
+            rb.linearVelocity = new Vector2(moveInputX * speed, rb.linearVelocity.y);
+        }
+    }
+
+    void HandleFrogWallLogic()
+    {
+        if (wallJumpBlockTimer > 0) return;
+
+        // Lógica para desgrudar da parede (segurando para o lado oposto)
+        bool tryingToDetach = (moveInputX != 0 && moveInputX != wallDirection);
+        if (tryingToDetach) wallDetachTimer += Time.deltaTime;
+        else wallDetachTimer = 0;
+
+        if (tryingToDetach && wallDetachTimer > wallDetachDelay)
+        {
+            // Desgruda
+            rb.gravityScale = 4;
+            rb.linearVelocity = new Vector2(moveInputX * frogSpeed, rb.linearVelocity.y);
+            return;
+        }
+
+        // Lógica de deslizar/grudar
+        rb.linearVelocity = new Vector2(0, rb.linearVelocity.y); // Trava horizontal
+
+        if (wallStickTimer > 0)
+        {
+            rb.gravityScale = 0; // Remove gravidade para ficar parado
+            
+            // Permite deslizar devagar se pressionar para baixo
+            if (moveInputY < 0) rb.linearVelocity = new Vector2(0, -wallClimbSpeed);
+            else rb.linearVelocity = Vector2.zero;
+
+            wallStickTimer -= Time.deltaTime;
+
+            // Garante que o sapo olhe para a parede oposta
+            if (wallDirection == 1 && isFacingRight) Flip();
+            else if (wallDirection == -1 && !isFacingRight) Flip();
+        }
+        else
+        {
+            // Começa a cair deslizando
+            rb.gravityScale = 4;
+            float slideVelocity = (moveInputY < 0) ? wallClimbSpeed : wallSlideSpeed;
+            // Clamp para não cair mais rápido que a velocidade de deslize
+            rb.linearVelocity = new Vector2(0, Mathf.Clamp(rb.linearVelocity.y, -slideVelocity, float.MaxValue));
+        }
+    }
+
+    void HandleJump()
+    {
+        if (currentState == PlayerState.Frog && isTouchingWall && !isGrounded)
+        {
+            PerformWallJump();
+        }
+        else
+        {
+            float force = (currentState == PlayerState.Warrior) ? warriorJumpForce : frogJumpForce;
+            PerformJump(force);
+        }
+    }
+
+    void PerformJump(float force)
+    {
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0); // Reseta velocidade vertical antes de pular
+        rb.AddForce(Vector2.up * force, ForceMode2D.Impulse);
+    }
+
+    void PerformDoubleJump()
+    {
+        canDoubleJump = false;
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
+        rb.AddForce(Vector2.up * frogJumpForce, ForceMode2D.Impulse);
+        
+        // AQUI ESTAVA O PORTUGUÊS: Agora está chamando UseJump()
+        if (excalibroController != null) excalibroController.UseJump(); 
+        Debug.Log("Double Jump executed!");
+    }
+
+    void PerformWallJump()
+    {
+        // Reseta timers
+        wallStickTimer = wallStickTime;
+        wallJumpBlockTimer = wallJumpBlockDuration;
+        wallDetachTimer = 0;
+
+        // Pula para o lado oposto da parede
+        int jumpDirection = -wallDirection;
+        rb.linearVelocity = Vector2.zero;
+        rb.AddForce(new Vector2(jumpDirection * wallJumpForceX, wallJumpForceY), ForceMode2D.Impulse);
+
+        // Vira o personagem
+        if (jumpDirection == 1 && !isFacingRight) Flip();
+        else if (jumpDirection == -1 && isFacingRight) Flip();
+    }
+    #endregion
+
+    #region Combat Logic (Warrior)
+    IEnumerator PerformNormalAttack()
+    {
+        isAttacking = true;
+        nextAttackTime = Time.time + attackCooldown;
+        
+        // Trava no ar brevemente
+        float originalGravity = rb.gravityScale;
+        rb.gravityScale = 0;
+        rb.linearVelocity = Vector2.zero;
+
+        if (anim != null) anim.SetTrigger("Attack");
+
+        // Detecta inimigos
+        Collider2D[] hitEnemies = Physics2D.OverlapCircleAll(attackPoint.position, attackRadius, enemyLayer);
+        foreach (Collider2D enemy in hitEnemies)
+        {
+            Destroy(enemy.gameObject); // Substituir por lógica de dano real depois
+        }
+
+        yield return new WaitForSeconds(airStallDuration);
+
+        // Restaura física
+        rb.gravityScale = originalGravity;
+        isAttacking = false;
+    }
+
+    IEnumerator PerformPogoAttack()
+    {
+        isAttacking = true;
+        nextAttackTime = Time.time + 0.2f; // Cooldown curto pro Pogo
+
+        if (anim != null) anim.SetTrigger("AttackDown");
+        yield return new WaitForSeconds(0.05f);
+
+        Collider2D[] hitObjects = Physics2D.OverlapCircleAll(pogoPoint.position, pogoRadius, enemyLayer);
+        bool hitSomething = false;
+
+        foreach (Collider2D obj in hitObjects)
+        {
+            Destroy(obj.gameObject);
+            hitSomething = true;
+        }
+
+        if (hitSomething)
+        {
+            // Rebote para cima
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
+            rb.AddForce(Vector2.up * pogoForce, ForceMode2D.Impulse);
+        }
+
+        yield return new WaitForSeconds(0.1f);
+        isAttacking = false;
+    }
+    #endregion
+
+    #region Tongue Mechanics (Frog)
+    void StartTongue()
+    {
+        Vector2 direction = isFacingRight ? Vector2.right : Vector2.left;
+        currentTongueState = TongueState.Shooting;
+        
+        if (anim != null) anim.SetTrigger("TongueShoot");
+
+        // Para o jogador no ar
+        rb.gravityScale = 0;
+        rb.linearVelocity = Vector2.zero;
+
+        // Timer de segurança
+        tongueStartTime = Time.time;
+
+        // Calcula origem e destino
+        Vector3 realOffset = isFacingRight ? mouthOffset : new Vector3(-mouthOffset.x, mouthOffset.y, 0);
+        Vector3 startPos = transform.position + realOffset;
+        currentTongueTipPos = startPos;
+
+        RaycastHit2D hit = Physics2D.Raycast(startPos, direction, tongueRange, groundLayer);
+        
+        if (hit.collider != null)
+        {
+            tongueTargetPos = hit.point;
+            hasHitWall = true;
+        }
+        else
+        {
+            tongueTargetPos = (Vector2)startPos + (direction * tongueRange);
+            hasHitWall = false;
+        }
+    }
+
+    void HandleTonguePhysics()
+    {
+        // SEGURANÇA: Se passar 1.5s travado, corta
+        if (Time.time > tongueStartTime + 1.5f)
+        {
+            Debug.Log("Tongue timeout. Resetting.");
+            StopTongue();
+            return;
+        }
+
+        switch (currentTongueState)
+        {
+            case TongueState.Shooting:
+                rb.linearVelocity = Vector2.zero;
+                // Move a ponta até o alvo
+                currentTongueTipPos = Vector2.MoveTowards(currentTongueTipPos, tongueTargetPos, tongueShootSpeed * Time.deltaTime);
                 
-                // Se chegar no destino (a parede alvo)
-                float distDestino = Vector2.Distance(transform.position, destinoLingua);
-                if (distDestino < 0.5f) FinalizarLingua(); 
+                if (Vector2.Distance(currentTongueTipPos, tongueTargetPos) < 0.1f)
+                {
+                    // Se bateu na parede, puxa o sapo. Se não, recolhe a língua.
+                    currentTongueState = hasHitWall ? TongueState.Pulling : TongueState.Retracting;
+                }
                 break;
 
-            case EstadoLingua.Retraindo:
+            case TongueState.Pulling:
+                rb.linearVelocity = Vector2.zero;
+                // Move o SAPO até a ponta
+                transform.position = Vector2.MoveTowards(transform.position, currentTongueTipPos, tonguePullSpeed * Time.deltaTime);
+
+                if (Vector2.Distance(transform.position, tongueTargetPos) < 0.5f)
+                {
+                    StopTongue();
+                }
+                break;
+
+            case TongueState.Retracting:
                 if (rb.gravityScale == 0) rb.linearVelocity = Vector2.zero;
-                Vector3 offsetReal = viradoDireita ? offsetBoca : new Vector3(-offsetBoca.x, offsetBoca.y, 0);
-                Vector3 alvoRetracao = transform.position + offsetReal;
-                pontaLinguaAtual = Vector2.MoveTowards(pontaLinguaAtual, alvoRetracao, velocidadeLinguaVolta * Time.deltaTime);
-                if (Vector2.Distance(pontaLinguaAtual, alvoRetracao) < 0.1f) FinalizarLingua(); break;
+                
+                // Traz a ponta de volta para a boca
+                Vector3 realOffset = isFacingRight ? mouthOffset : new Vector3(-mouthOffset.x, mouthOffset.y, 0);
+                Vector3 retractTarget = transform.position + realOffset;
+                
+                currentTongueTipPos = Vector2.MoveTowards(currentTongueTipPos, retractTarget, tongueRetractSpeed * Time.deltaTime);
+                
+                if (Vector2.Distance(currentTongueTipPos, retractTarget) < 0.1f)
+                {
+                    StopTongue();
+                }
+                break;
         }
     }
 
-    void FinalizarLingua() { 
-        estadoLingua = EstadoLingua.Pronta; 
-        rb.gravityScale = 4; // Restaura a gravidade imediatamente
-        rb.linearVelocity = Vector2.zero; // Zera inércia louca
-        tempoParaProximaLingua = Time.time + delayEntreLinguadas;
-    }
-    
-    void ProcessarPulo() {
-        if (estadoAtual == Estado.Sapo && isTouchingWall && !isGrounded) 
-        {
-            RealizarWallJump();
-        }
-        else 
-        {
-            float forca = (estadoAtual == Estado.Guerreiro) ? puloGuerreiro : puloSapo;
-            ExecutarPulo(forca);
-        }
-    }
-
-    void ExecutarPuloDuplo()
+    void StopTongue()
     {
-        canDoubleJump = false; 
-        rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
-        rb.AddForce(Vector2.up * puloSapo, ForceMode2D.Impulse);
-        if(excalibroScript != null) excalibroScript.UsarPulo();
-        Debug.Log("Excalibro Jump!");
+        currentTongueState = TongueState.Ready;
+        rb.gravityScale = 4; // Restaura gravidade
+        rb.linearVelocity = Vector2.zero;
+        nextTongueTime = Time.time + tongueCooldown;
     }
 
-    void ExecutarPulo(float forca) { 
-        rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0); 
-        rb.AddForce(Vector2.up * forca, ForceMode2D.Impulse); 
-        anim.SetBool("IsJumping", true);
-        stretch.DoJump();
-        }
+    void DrawTongue()
+    {
+        if (lineRenderer == null) return;
 
-    void VerificarColisoes() {
-        float margem = 0.05f; Bounds b = colisor.bounds;
-        isGrounded = Physics2D.BoxCast(b.center, b.size, 0f, Vector2.down, margem, layerSolido);
-        Vector2 tamanhoSensorParede = new Vector2(b.size.x, b.size.y * 0.9f);
-        bool paredeDir = Physics2D.BoxCast(b.center, tamanhoSensorParede, 0f, Vector2.right, margem, layerSolido);
-        bool paredeEsq = Physics2D.BoxCast(b.center, tamanhoSensorParede, 0f, Vector2.left, margem, layerSolido);
-        if (paredeDir) { isTouchingWall = true; ladoParede = 1; } else if (paredeEsq) { isTouchingWall = true; ladoParede = -1; } else { isTouchingWall = false; ladoParede = 0; }
-        if (isGrounded) anim.SetBool("IsJumping", !isGrounded);
-        if (!prevGrounded && isGrounded){
-            anim.SetTrigger("Land");
-            stretch.DoLand();
-        }
-        prevGrounded = isGrounded;
-    }
-
-    void Flip() { viradoDireita = !viradoDireita; Vector3 escala = transform.localScale; escala.x *= -1; transform.localScale = escala; }
-
-    void TrocarEstado(Estado novo) { 
-        estadoAtual = novo; 
-        sr.color = (estadoAtual == Estado.Guerreiro) ? corGuerreiro : corSapo; 
-        if(anim != null) anim.SetBool("IsSapo", estadoAtual == Estado.Sapo);
-        
-        if(excalibroScript != null)
+        if (currentTongueState != TongueState.Ready)
         {
-            if(novo == Estado.Sapo) excalibroScript.Aparecer();
-            else excalibroScript.Sumir();
+            lineRenderer.enabled = true;
+            lineRenderer.positionCount = 2;
+            Vector3 realOffset = isFacingRight ? mouthOffset : new Vector3(-mouthOffset.x, mouthOffset.y, 0);
+            lineRenderer.SetPosition(0, transform.position + realOffset);
+            lineRenderer.SetPosition(1, currentTongueTipPos);
+        }
+        else
+        {
+            lineRenderer.enabled = false;
+        }
+    }
+    #endregion
+
+    #region Utils & Core Logic
+    void CheckCollisions()
+    {
+        float margin = 0.05f;
+        Bounds b = boxCollider.bounds;
+
+        // Verifica chão
+        isGrounded = Physics2D.BoxCast(b.center, b.size, 0f, Vector2.down, margin, groundLayer);
+
+        // Verifica paredes
+        Vector2 wallSensorSize = new Vector2(b.size.x, b.size.y * 0.9f);
+        bool wallRight = Physics2D.BoxCast(b.center, wallSensorSize, 0f, Vector2.right, margin, groundLayer);
+        bool wallLeft = Physics2D.BoxCast(b.center, wallSensorSize, 0f, Vector2.left, margin, groundLayer);
+
+        if (wallRight) { isTouchingWall = true; wallDirection = 1; }
+        else if (wallLeft) { isTouchingWall = true; wallDirection = -1; }
+        else { isTouchingWall = false; wallDirection = 0; }
+    }
+
+    void HandleGroundLogic()
+    {
+        if (isGrounded && !canDoubleJump)
+        {
+            canDoubleJump = true;
+            if (excalibroController != null && currentState == PlayerState.Frog)
+            {
+                // AQUI TAMBÉM: Atualizado para Recharge()
+                excalibroController.Recharge(); 
+            }
+        }
+    }
+
+    void Flip()
+    {
+        isFacingRight = !isFacingRight;
+        Vector3 scale = transform.localScale;
+        scale.x *= -1;
+        transform.localScale = scale;
+    }
+
+    void SwitchState(PlayerState newState)
+    {
+        currentState = newState;
+        sr.color = (currentState == PlayerState.Warrior) ? warriorColor : frogColor;
+
+        if (anim != null) anim.SetBool("IsSapo", currentState == PlayerState.Frog);
+
+        if (excalibroController != null)
+        {
+            // AQUI TAMBÉM: Atualizado para Appear() e Vanish()
+            if (newState == PlayerState.Frog) excalibroController.Appear();
+            else excalibroController.Vanish();
         }
 
-        rb.gravityScale = 4; 
-        if(novo == Estado.Guerreiro) wallStickTimer = 0; 
+        rb.gravityScale = 4;
+        if (newState == PlayerState.Warrior) wallStickTimer = 0;
     }
-    
-    void OnDrawGizmos() {
-        if (colisor == null) return;
-        Gizmos.color = Color.red; Gizmos.DrawWireCube(colisor.bounds.center + Vector3.down * 0.05f, colisor.bounds.size);
-        if (pontoAtaque != null) { Gizmos.color = Color.cyan; Gizmos.DrawWireSphere(pontoAtaque.position, raioAtaque); }
-        if (pontoPogo != null) { Gizmos.color = Color.yellow; Gizmos.DrawWireSphere(pontoPogo.position, raioPogo); }
+
+    public void Die()
+    {
+        if (isDead) return;
+        isDead = true;
+        rb.linearVelocity = Vector2.zero;
+        rb.gravityScale = 1;
+        if (anim != null) anim.SetTrigger("Die");
+        if (excalibroController != null) excalibroController.Vanish();
     }
+
+    void UpdateAnimations()
+    {
+        if (anim == null) return;
+        anim.SetFloat("Speed", Mathf.Abs(moveInputX));
+        anim.SetFloat("VerticalVelocity", rb.linearVelocity.y);
+        anim.SetBool("IsGrounded", isGrounded);
+        anim.SetBool("IsSapo", currentState == PlayerState.Frog);
+        
+        bool isSliding = (currentState == PlayerState.Frog && isTouchingWall && !isGrounded && rb.linearVelocity.y < 0);
+        anim.SetBool("IsWallSliding", isSliding);
+        anim.SetBool("IsGrappling", currentTongueState != TongueState.Ready);
+    }
+
+    void OnDrawGizmos()
+    {
+        if (boxCollider == null) return;
+        
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireCube(boxCollider.bounds.center + Vector3.down * 0.05f, boxCollider.bounds.size);
+
+        if (attackPoint != null)
+        {
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawWireSphere(attackPoint.position, attackRadius);
+        }
+        if (pogoPoint != null)
+        {
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawWireSphere(pogoPoint.position, pogoRadius);
+        }
+    }
+    #endregion
 }
