@@ -11,7 +11,7 @@ public class PropWiggle : MonoBehaviour
     private float wiggleDirection = 1f;
     private float wiggleTimer = 0f;
 
-    private bool isWiggling = false;   // <- impede repetição
+    public bool isWiggling = false;   // <- impede repetição
     private float resetThreshold = 0.05f;
 
     void Update()
