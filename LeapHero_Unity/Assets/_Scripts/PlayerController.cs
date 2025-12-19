@@ -115,6 +115,9 @@ public class PlayerController : MonoBehaviour
 
         // Inicia como Guerreiro por padrão
         SwitchState(PlayerState.Warrior);
+        
+        // Pega o script de vida para mudar a cara do sapo depois
+        if (GetComponent<PlayerHealth>() == null) Debug.LogError("PlayerHealth not found");
     }
 
     void Update()
@@ -302,6 +305,17 @@ public class PlayerController : MonoBehaviour
             // Garante que o sapo olhe para a parede oposta
             if (wallDirection == 1 && isFacingRight) Flip();
             else if (wallDirection == -1 && !isFacingRight) Flip();
+
+            // Se o jogador apertar para baixo para descer voluntariamente
+            if (moveInputY < 0) 
+            {
+                 GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.WallSlide);
+            }
+            else 
+            {
+                 // Se estiver parado grudado, cara normal (Idle)
+                 GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Idle);
+            }
         }
         else
         {
@@ -310,6 +324,12 @@ public class PlayerController : MonoBehaviour
             float slideVelocity = (moveInputY < 0) ? wallClimbSpeed : wallSlideSpeed;
             // Clamp para não cair mais rápido que a velocidade de deslize
             rb.linearVelocity = new Vector2(0, Mathf.Clamp(rb.linearVelocity.y, -slideVelocity, float.MaxValue));
+
+            // Se está caindo (escorregando)
+            if (rb.linearVelocity.y < 0)
+            {
+                GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.WallSlide);
+            }
         }
     }
 
@@ -330,6 +350,11 @@ public class PlayerController : MonoBehaviour
     {
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0); // Reseta velocidade vertical antes de pular
         rb.AddForce(Vector2.up * force, ForceMode2D.Impulse);
+
+        if (currentState == PlayerState.Frog)// Se for sapo, faz cara de pulo
+        {
+            GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Jump);
+        }
     }
 
     void PerformDoubleJump()
@@ -354,6 +379,7 @@ public class PlayerController : MonoBehaviour
         int jumpDirection = -wallDirection;
         rb.linearVelocity = Vector2.zero;
         rb.AddForce(new Vector2(jumpDirection * wallJumpForceX, wallJumpForceY), ForceMode2D.Impulse);
+        GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Jump);// Força a cara de pulo ao pular da parede
 
         // Vira o personagem
         if (jumpDirection == 1 && !isFacingRight) Flip();
@@ -424,6 +450,8 @@ public class PlayerController : MonoBehaviour
         currentTongueState = TongueState.Shooting;
         
         if (anim != null) anim.SetTrigger("TongueShoot");
+
+        GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Tongue);
 
         // Para o jogador no ar
         rb.gravityScale = 0;
@@ -509,6 +537,7 @@ public class PlayerController : MonoBehaviour
         rb.gravityScale = 4; // Restaura gravidade
         rb.linearVelocity = Vector2.zero;
         nextTongueTime = Time.time + tongueCooldown;
+        GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Idle); // Reseta a cara para Idle (se não estiver atordoado, o PlayerHealth cuida da prioridade)
     }
 
     void DrawTongue()
@@ -548,20 +577,27 @@ public class PlayerController : MonoBehaviour
         else if (wallLeft) { isTouchingWall = true; wallDirection = -1; }
         else { isTouchingWall = false; wallDirection = 0; }
     }
-
-    void HandleGroundLogic()
+void HandleGroundLogic()
     {
+        // BLOCO 1: Roda SEMPRE que estiver no chão (Correção Visual)
+        // Isso garante que, se ele estiver andando ou parado, a cara volta para Idle.
+        // Tiramos isso de dentro do "!canDoubleJump" para ele corrigir a cara a todo momento.
+        if (isGrounded && currentState == PlayerState.Frog && currentTongueState == TongueState.Ready)
+        {
+            GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Idle);
+        }
+
+        // BLOCO 2: Roda SÓ AO POUSAR (Mecânicas)
+        // Isso serve para não ficar recarregando a espada infinitamente a cada frame.
         if (isGrounded && !canDoubleJump)
         {
             canDoubleJump = true;
             if (excalibroController != null && currentState == PlayerState.Frog)
             {
-                // AQUI TAMBÉM: Atualizado para Recharge()
                 excalibroController.Recharge(); 
             }
         }
     }
-
     void Flip()
     {
         isFacingRight = !isFacingRight;
@@ -586,6 +622,8 @@ public class PlayerController : MonoBehaviour
 
         rb.gravityScale = 4;
         if (newState == PlayerState.Warrior) wallStickTimer = 0;
+        PlayerHealth healthScript = GetComponent<PlayerHealth>();
+        if (healthScript != null) healthScript.OnStateChanged();
     }
 
     public void Die()

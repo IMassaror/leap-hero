@@ -119,6 +119,42 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &392682340
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 392682341}
+  m_Layer: 5
+  m_Name: FrogHUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &392682341
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 392682340}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 2051260309}
+  m_Father: {fileID: 1918450552}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 26, y: -8}
+  m_SizeDelta: {x: 16, y: 16}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -657,15 +693,23 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VidaPlayer
   maxWarriorHealth: 3
-  currentHealth: 0
   restartDelay: 2
-  hearts:
+  frogRegenTime: 3
+  knightHUDObject: {fileID: 941034225}
+  frogHUDObject: {fileID: 392682340}
+  knightHearts:
   - {fileID: 1032501403}
   - {fileID: 1589513901}
   - {fileID: 787683409}
-  fullHeart: {fileID: 1827610470, guid: 135b90e2591a6cd4593772963198476a, type: 3}
-  emptyHeart: {fileID: 293488748, guid: 135b90e2591a6cd4593772963198476a, type: 3}
-  invincibilityDuration: 1
+  fullHeartSprite: {fileID: 293488748, guid: 135b90e2591a6cd4593772963198476a, type: 3}
+  emptyHeartSprite: {fileID: 1827610470, guid: 135b90e2591a6cd4593772963198476a, type: 3}
+  frogFaceImage: {fileID: 2051260310}
+  faceIdle: {fileID: 5239765187843398177, guid: 135b90e2591a6cd4593772963198476a, type: 3}
+  faceJump: {fileID: 406663951, guid: 26ecfd6b1c3620641813d961ce5476e2, type: 3}
+  faceTongue: {fileID: -1533059334, guid: 135b90e2591a6cd4593772963198476a, type: 3}
+  faceStunned: {fileID: -5156352867933855857, guid: 135b90e2591a6cd4593772963198476a, type: 3}
+  faceDead: {fileID: 10911, guid: 0000000000000000f000000000000000, type: 0}
+  faceWallSlide: {fileID: 10913, guid: 0000000000000000f000000000000000, type: 0}
   spriteRenderer: {fileID: 615356729}
 --- !u!95 &615356736
 Animator:
@@ -859,7 +903,7 @@ GameObject:
   - component: {fileID: 941034226}
   - component: {fileID: 941034227}
   m_Layer: 5
-  m_Name: HealthBar
+  m_Name: KnightHUD
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1491,8 +1535,8 @@ Transform:
   m_GameObject: {fileID: 1344830391}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 5.4187, y: -5, z: 0}
-  m_LocalScale: {x: 30.838001, y: 1, z: 1}
+  m_LocalPosition: {x: 8.1958, y: -5, z: 0}
+  m_LocalScale: {x: 36.391926, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -2036,6 +2080,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 941034226}
+  - {fileID: 392682341}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: -0.759}
   m_AnchorMin: {x: 0, y: 0}
@@ -2075,6 +2120,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CausarDano
   damageAmount: 1
+  killWarriorInstantly: 0
+  killFrogInstantly: 0
 --- !u!61 &1991820392
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -2194,6 +2241,81 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2051260308
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2051260309}
+  - component: {fileID: 2051260311}
+  - component: {fileID: 2051260310}
+  m_Layer: 5
+  m_Name: FrogFaceImage
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &2051260309
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2051260308}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 392682341}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 16, y: 16}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &2051260310
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2051260308}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 0}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &2051260311
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2051260308}
+  m_CullTransparentMesh: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
