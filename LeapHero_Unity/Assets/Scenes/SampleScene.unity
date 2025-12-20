@@ -537,7 +537,7 @@ MonoBehaviour:
   tongueRetractSpeed: 35
   tonguePullSpeed: 18
   tongueCooldown: 0.5
-  mouthOffset: {x: 0, y: 0, z: 0}
+  mouthOffset: {x: 0.5, y: 0.8, z: 0}
   isAttacking: 0
   isGrounded: 0
   prevGrounded: 0
