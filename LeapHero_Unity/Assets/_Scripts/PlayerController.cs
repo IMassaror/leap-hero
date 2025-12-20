@@ -35,10 +35,11 @@ public class PlayerController : MonoBehaviour
     public float airStallDuration = 0.3f; // Tempo que ele para no ar ao bater
     public float attackCooldown = 0.4f;
     
-    [Header("Warrior - Pogo Mechanics")]
-    public float pogoForce = 14f;       // Força do pulo ao bater pra baixo
-    public Transform pogoPoint;         // Ponto de colisão do ataque pra baixo
-    public float pogoRadius = 0.6f;
+    [Header("Warrior - Ground Pound")] // --- ADICIONADO PARA O ATAQUE DE ESMAGAR ---
+    public float groundPoundSpeed = 20f;
+    public float groundPoundRadius = 0.8f;
+    // Vamos usar o pogoPoint se não tiver um especifico, ou crie um novo transform nos pés
+    public Transform pogoPoint; 
 
     [Header("Frog Settings")]
     public float frogSpeed = 7f;
@@ -89,6 +90,7 @@ public class PlayerController : MonoBehaviour
 
     // Controle de Parede
     private int wallDirection = 0; // 1 = Direita, -1 = Esquerda, 0 = Nenhuma
+    private bool wasTouchingWall; // Para detectar entrada na parede
 
     // Controle da Língua
     private Vector2 tongueTargetPos;
@@ -118,6 +120,10 @@ public class PlayerController : MonoBehaviour
         
         // Pega o script de vida para mudar a cara do sapo depois
         if (GetComponent<PlayerHealth>() == null) Debug.LogError("PlayerHealth not found");
+        
+        // Configura respawn inicial se tiver LevelManager
+        if (LevelManager.instance != null && LevelManager.instance.currentRespawnPoint == Vector3.zero)
+            LevelManager.instance.currentRespawnPoint = transform.position;
     }
 
     void Update()
@@ -186,11 +192,39 @@ public class PlayerController : MonoBehaviour
             }
         }
     }
+    
+    // --- COLETA DE ITENS ---
+    void OnTriggerEnter2D(Collider2D collision)
+    {
+        if (collision.CompareTag("Coin"))
+        {
+            if (CoinManager.instance != null) CoinManager.instance.AddCoins(1);
+            Destroy(collision.gameObject);
+        }
+    }
     #endregion
 
     #region Input & Actions
     void HandleInput()
     {
+        // --- NOVO: BACKFLIP (Cancelar Língua ao Pular) ---
+        if (currentTongueState == TongueState.Pulling && Input.GetButtonDown("Jump"))
+        {
+            StopTongue(); // Para a língua imediatamente
+            
+            // Calcula direção: para trás de onde o sapo está olhando
+            float backflipX = isFacingRight ? -6f : 6f; 
+            float backflipY = 10f; // Força para cima
+            
+            rb.linearVelocity = Vector2.zero; // Zera a inércia do puxão
+            rb.AddForce(new Vector2(backflipX, backflipY), ForceMode2D.Impulse);
+            
+            GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Jump);
+            
+            return; // Impede de tentar pular normal no mesmo frame
+        }
+        // ----------------------------------------
+
         // Se estiver atacando, trava movimento horizontal
         if (isAttacking) moveInputX = 0;
         else moveInputX = Input.GetAxisRaw("Horizontal");
@@ -236,9 +270,16 @@ public class PlayerController : MonoBehaviour
         // Input de Ataque (Guerreiro)
         if (currentState == PlayerState.Warrior && Input.GetKeyDown(attackKey) && Time.time > nextAttackTime && !isAttacking)
         {
-            // Ataque para baixo (Pogo) ou Ataque Normal
-            if (!isGrounded && moveInputY < -0.1f) StartCoroutine(PerformPogoAttack());
-            else StartCoroutine(PerformNormalAttack());
+            // --- GROUND POUND (NOVO) ---
+            // Se estiver no ar E segurando pra baixo -> Ground Pound
+            if (!isGrounded && moveInputY < -0.1f) 
+            {
+                StartCoroutine(PerformGroundPound());
+            }
+            else 
+            {
+                StartCoroutine(PerformNormalAttack());
+            }
         }
 
         // Virar o personagem (Flip)
@@ -274,6 +315,9 @@ public class PlayerController : MonoBehaviour
 
     void HandleFrogWallLogic()
     {
+        // Zera o timer se detectar que parou na parede (Física)
+        if (Mathf.Abs(rb.linearVelocity.x) < 0.1f) wallJumpBlockTimer = 0;
+        
         if (wallJumpBlockTimer > 0) return;
 
         // Lógica para desgrudar da parede (segurando para o lado oposto)
@@ -306,26 +350,17 @@ public class PlayerController : MonoBehaviour
             if (wallDirection == 1 && isFacingRight) Flip();
             else if (wallDirection == -1 && !isFacingRight) Flip();
 
-            // Se o jogador apertar para baixo para descer voluntariamente
-            if (moveInputY < 0) 
-            {
-                 GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.WallSlide);
-            }
-            else 
-            {
-                 // Se estiver parado grudado, cara normal (Idle)
-                 GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Idle);
-            }
+            // Rosto do sapo
+            if (moveInputY < 0) GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.WallSlide);
+            else GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Idle);
         }
         else
         {
             // Começa a cair deslizando
             rb.gravityScale = 4;
             float slideVelocity = (moveInputY < 0) ? wallClimbSpeed : wallSlideSpeed;
-            // Clamp para não cair mais rápido que a velocidade de deslize
             rb.linearVelocity = new Vector2(0, Mathf.Clamp(rb.linearVelocity.y, -slideVelocity, float.MaxValue));
 
-            // Se está caindo (escorregando)
             if (rb.linearVelocity.y < 0)
             {
                 GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.WallSlide);
@@ -363,7 +398,6 @@ public class PlayerController : MonoBehaviour
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
         rb.AddForce(Vector2.up * frogJumpForce, ForceMode2D.Impulse);
         
-        // AQUI ESTAVA O PORTUGUÊS: Agora está chamando UseJump()
         if (excalibroController != null) excalibroController.UseJump(); 
         Debug.Log("Double Jump executed!");
     }
@@ -379,7 +413,7 @@ public class PlayerController : MonoBehaviour
         int jumpDirection = -wallDirection;
         rb.linearVelocity = Vector2.zero;
         rb.AddForce(new Vector2(jumpDirection * wallJumpForceX, wallJumpForceY), ForceMode2D.Impulse);
-        GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Jump);// Força a cara de pulo ao pular da parede
+        GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Jump);
 
         // Vira o personagem
         if (jumpDirection == 1 && !isFacingRight) Flip();
@@ -414,32 +448,64 @@ public class PlayerController : MonoBehaviour
         isAttacking = false;
     }
 
-    IEnumerator PerformPogoAttack()
+    // --- GROUND POUND (Novo Pogo) ---
+    IEnumerator PerformGroundPound()
     {
         isAttacking = true;
-        nextAttackTime = Time.time + 0.2f; // Cooldown curto pro Pogo
+        // Não define nextAttackTime aqui para permitir spammar se errar, ou defina se quiser cooldown
 
-        if (anim != null) anim.SetTrigger("AttackDown");
-        yield return new WaitForSeconds(0.05f);
+        // 1. Inicia descida
+        rb.linearVelocity = new Vector2(0, -groundPoundSpeed); // Desce rápido
+        if (anim != null) anim.SetTrigger("AttackDown"); // Use animação de cair atacando
 
-        Collider2D[] hitObjects = Physics2D.OverlapCircleAll(pogoPoint.position, pogoRadius, enemyLayer);
+        // 2. Loop enquanto não toca o chão
         bool hitSomething = false;
-
-        foreach (Collider2D obj in hitObjects)
+        while (!isGrounded)
         {
-            Destroy(obj.gameObject);
-            hitSomething = true;
+            // Mantém velocidade constante para baixo
+            rb.linearVelocity = new Vector2(0, -groundPoundSpeed);
+
+            // Verifica colisão com inimigos ou quebráveis
+            // Usa pogoPoint (se tiver) ou transform.position
+            Vector2 checkPos = pogoPoint != null ? pogoPoint.position : transform.position;
+            Collider2D[] hitObjects = Physics2D.OverlapCircleAll(checkPos, groundPoundRadius, enemyLayer | groundLayer);
+
+            foreach (Collider2D obj in hitObjects)
+            {
+                // Se for Inimigo
+                if (obj.CompareTag("Enemy")) 
+                {
+                    // obj.GetComponent<EnemyHealth>()?.TakeDamage(2); 
+                    Destroy(obj.gameObject); 
+                    hitSomething = true;
+                }
+                
+                // Se for Quebrável ou Botão
+                if (obj.CompareTag("Breakable"))
+                {
+                    Destroy(obj.gameObject);
+                    hitSomething = true;
+                }
+                
+                if (obj.CompareTag("Button"))
+                {
+                    // obj.GetComponent<ButtonScript>()?.Activate();
+                    hitSomething = true;
+                }
+            }
+
+            // Se bateu em algo, sai do loop
+            if (hitSomething) break;
+
+            yield return null; // Espera próximo frame
         }
 
-        if (hitSomething)
-        {
-            // Rebote para cima
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
-            rb.AddForce(Vector2.up * pogoForce, ForceMode2D.Impulse);
-        }
-
+        // 3. Impacto no Chão
+        rb.linearVelocity = Vector2.zero;
         yield return new WaitForSeconds(0.1f);
+
         isAttacking = false;
+        nextAttackTime = Time.time + 0.2f; // Cooldown curto
     }
     #endregion
 
@@ -474,6 +540,7 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
+            // SE NÃO BATER, AINDA TEM ALVO (MAX RANGE)
             tongueTargetPos = (Vector2)startPos + (direction * tongueRange);
             hasHitWall = false;
         }
@@ -484,7 +551,6 @@ public class PlayerController : MonoBehaviour
         // SEGURANÇA: Se passar 1.5s travado, corta
         if (Time.time > tongueStartTime + 1.5f)
         {
-            Debug.Log("Tongue timeout. Resetting.");
             StopTongue();
             return;
         }
@@ -496,9 +562,10 @@ public class PlayerController : MonoBehaviour
                 // Move a ponta até o alvo
                 currentTongueTipPos = Vector2.MoveTowards(currentTongueTipPos, tongueTargetPos, tongueShootSpeed * Time.deltaTime);
                 
+                // --- CORREÇÃO: Garante que muda de estado ao chegar ---
                 if (Vector2.Distance(currentTongueTipPos, tongueTargetPos) < 0.1f)
                 {
-                    // Se bateu na parede, puxa o sapo. Se não, recolhe a língua.
+                    // Se bateu na parede, puxa. Se não bateu (Miss), recolhe (Retracting).
                     currentTongueState = hasHitWall ? TongueState.Pulling : TongueState.Retracting;
                 }
                 break;
@@ -537,7 +604,7 @@ public class PlayerController : MonoBehaviour
         rb.gravityScale = 4; // Restaura gravidade
         rb.linearVelocity = Vector2.zero;
         nextTongueTime = Time.time + tongueCooldown;
-        GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Idle); // Reseta a cara para Idle (se não estiver atordoado, o PlayerHealth cuida da prioridade)
+        GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Idle); 
     }
 
     void DrawTongue()
@@ -576,19 +643,23 @@ public class PlayerController : MonoBehaviour
         if (wallRight) { isTouchingWall = true; wallDirection = 1; }
         else if (wallLeft) { isTouchingWall = true; wallDirection = -1; }
         else { isTouchingWall = false; wallDirection = 0; }
+        
+        // CORREÇÃO: Reseta timers ao tocar na parede nova
+        if (!wasTouchingWall && isTouchingWall && currentState == PlayerState.Frog) 
+        { 
+            wallStickTimer = wallStickTime; 
+            wallJumpBlockTimer = 0; 
+        }
+        wasTouchingWall = isTouchingWall;
     }
-void HandleGroundLogic()
+    
+    void HandleGroundLogic()
     {
-        // BLOCO 1: Roda SEMPRE que estiver no chão (Correção Visual)
-        // Isso garante que, se ele estiver andando ou parado, a cara volta para Idle.
-        // Tiramos isso de dentro do "!canDoubleJump" para ele corrigir a cara a todo momento.
         if (isGrounded && currentState == PlayerState.Frog && currentTongueState == TongueState.Ready)
         {
             GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Idle);
         }
 
-        // BLOCO 2: Roda SÓ AO POUSAR (Mecânicas)
-        // Isso serve para não ficar recarregando a espada infinitamente a cada frame.
         if (isGrounded && !canDoubleJump)
         {
             canDoubleJump = true;
@@ -598,6 +669,7 @@ void HandleGroundLogic()
             }
         }
     }
+    
     void Flip()
     {
         isFacingRight = !isFacingRight;
@@ -615,7 +687,6 @@ void HandleGroundLogic()
 
         if (excalibroController != null)
         {
-            // AQUI TAMBÉM: Atualizado para Appear() e Vanish()
             if (newState == PlayerState.Frog) excalibroController.Appear();
             else excalibroController.Vanish();
         }
@@ -634,6 +705,27 @@ void HandleGroundLogic()
         rb.gravityScale = 1;
         if (anim != null) anim.SetTrigger("Die");
         if (excalibroController != null) excalibroController.Vanish();
+        StartCoroutine(RespawnRoutine());
+    }
+
+    IEnumerator RespawnRoutine()
+    {
+        yield return new WaitForSeconds(1f);
+
+        if (LevelManager.instance != null)
+        {
+            LevelManager.instance.Respawn(this.gameObject);
+        }
+        else
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
+        }
+
+        isDead = false;
+        isAttacking = false;
+        rb.gravityScale = 4;
+        SwitchState(PlayerState.Warrior);
+        if (anim != null) anim.Play("idle_h");
     }
 
     void UpdateAnimations()
@@ -664,7 +756,7 @@ void HandleGroundLogic()
         if (pogoPoint != null)
         {
             Gizmos.color = Color.yellow;
-            Gizmos.DrawWireSphere(pogoPoint.position, pogoRadius);
+            Gizmos.DrawWireSphere(pogoPoint.position, groundPoundRadius);
         }
     }
     #endregion

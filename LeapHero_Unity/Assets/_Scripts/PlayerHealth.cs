@@ -6,7 +6,6 @@ using System.Collections;
 public class PlayerHealth : MonoBehaviour
 {
     #region Enums
-    // ADICIONADO: WallSlide
     public enum FrogFaceState { Idle, Jump, Tongue, Stunned, Dead, WallSlide }
     #endregion
 
@@ -30,7 +29,7 @@ public class PlayerHealth : MonoBehaviour
     public Sprite faceTongue;
     public Sprite faceStunned;
     public Sprite faceDead;
-    public Sprite faceWallSlide; // --- NOVO SPRITE ---
+    public Sprite faceWallSlide; 
 
     [Header("Visuals")]
     public SpriteRenderer spriteRenderer; 
@@ -64,7 +63,6 @@ public class PlayerHealth : MonoBehaviour
 
     #region Public Methods
 
-    // --- MUDANÇA AQUI: Agora aceita dois booleans ---
     public void TakeDamage(int damage, bool killWarrior = false, bool killFrog = false)
     {
         if (hasDied) return;
@@ -72,7 +70,6 @@ public class PlayerHealth : MonoBehaviour
         // Lógica do Sapo
         if (playerController.currentState == PlayerController.PlayerState.Frog)
         {
-            // Mata se for KillFrog marcado OU se já estiver sem escudo (vida 1)
             if (killFrog || savedFrogHealth <= 1)
             {
                 if(!hasDied) 
@@ -84,7 +81,6 @@ public class PlayerHealth : MonoBehaviour
             }
             else if (!isInvincible)
             {
-                // Dano Não Letal
                 savedFrogHealth = 1;
                 SetFrogFace(FrogFaceState.Stunned);
                 
@@ -97,7 +93,7 @@ public class PlayerHealth : MonoBehaviour
         // Lógica do Guerreiro
         if (isInvincible) return;
 
-        if (killWarrior) savedWarriorHealth = 0; // Mata só se killWarrior estiver true
+        if (killWarrior) savedWarriorHealth = 0; 
         else savedWarriorHealth -= damage;
 
         currentHealth = savedWarriorHealth;
@@ -118,18 +114,9 @@ public class PlayerHealth : MonoBehaviour
     {
         if (playerController.currentState != PlayerController.PlayerState.Frog || hasDied) return;
 
-        // --- SISTEMA DE PRIORIDADE ATUALIZADO ---
         if (currentFrogFace == FrogFaceState.Dead) return;
-
-        // Stun ganha de tudo
-        if (currentFrogFace == FrogFaceState.Stunned && newState != FrogFaceState.Dead && newState != FrogFaceState.Stunned) 
-            return;
-
-        // Língua ganha de movimento
-        if (currentFrogFace == FrogFaceState.Tongue && newState != FrogFaceState.Dead && newState != FrogFaceState.Stunned && newState != FrogFaceState.Idle)
-        {
-             // Impede trocar lingua por pulo/slide, mas deixa voltar pra idle
-        }
+        if (currentFrogFace == FrogFaceState.Stunned && newState != FrogFaceState.Dead && newState != FrogFaceState.Stunned) return;
+        if (currentFrogFace == FrogFaceState.Tongue && newState != FrogFaceState.Dead && newState != FrogFaceState.Stunned && newState != FrogFaceState.Idle) {}
 
         currentFrogFace = newState;
         UpdateFrogUI();
@@ -180,7 +167,7 @@ public class PlayerHealth : MonoBehaviour
             case FrogFaceState.Tongue: frogFaceImage.sprite = faceTongue; break;
             case FrogFaceState.Stunned: frogFaceImage.sprite = faceStunned; break;
             case FrogFaceState.Dead: frogFaceImage.sprite = faceDead; break;
-            case FrogFaceState.WallSlide: frogFaceImage.sprite = faceWallSlide; break; // Adicionado
+            case FrogFaceState.WallSlide: frogFaceImage.sprite = faceWallSlide; break; 
         }
     }
 
@@ -207,14 +194,14 @@ public class PlayerHealth : MonoBehaviour
     {
         if(hasDied) return;
         hasDied = true;
+        
+        // Avisa o PlayerController que morreu.
+        // O PlayerController vai chamar a animação de morte e depois chamar o LevelManager para o respawn.
         if(playerController != null) playerController.Die();
-        StartCoroutine(RestartLevelRoutine());
-    }
 
-    IEnumerator RestartLevelRoutine()
-    {
-        yield return new WaitForSeconds(restartDelay);
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        // --- CORREÇÃO IMPORTANTE ---
+        // Removi o RestartLevelRoutine(). 
+        // Não queremos recarregar a cena, queremos usar o Checkpoint do LevelManager.
     }
 
     IEnumerator InvincibilityRoutine()
@@ -229,4 +216,34 @@ public class PlayerHealth : MonoBehaviour
         isInvincible = false;
     }
     #endregion
+
+    // =========================================================================
+    // FUNÇÃO CORRIGIDA PARA O RESPAWN (Sem erros de variável)
+    // =========================================================================
+    public void ResetStatus()
+    {
+        // 1. Reseta lógica
+        hasDied = false;
+        isInvincible = false;
+
+        // 2. Para de piscar imediatamente
+        StopAllCoroutines(); 
+        
+        // 3. Garante que o Sprite fique visível
+        // Isso corrige o bug de nascer invisível se morreu enquanto piscava
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.enabled = true; 
+            spriteRenderer.color = Color.white;
+        }
+
+        // 4. Enche a vida de novo
+        savedWarriorHealth = maxWarriorHealth; // Aqui estava o erro (era maxHealth)
+        savedFrogHealth = 2; // Sapo volta inteiro
+
+        // 5. Atualiza a UI visualmente
+        UpdateStateFromController();
+        
+        Debug.Log("Status do Jogador Resetado!");
+    }
 }
