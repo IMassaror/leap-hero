@@ -498,6 +498,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController
   currentState: 0
   currentTongueState: 0
+  animationLockTime: 0
   excalibroController: {fileID: 943345309}
   lineRenderer: {fileID: 615356734}
   pSprite: {fileID: 2034772610}
@@ -537,8 +538,11 @@ MonoBehaviour:
   tonguePullSpeed: 18
   tongueCooldown: 0.5
   mouthOffset: {x: 0, y: 0, z: 0}
+  isAttacking: 0
   isGrounded: 0
+  prevGrounded: 0
   isTouchingWall: 0
+  isLanding: 0
 --- !u!120 &615356734
 LineRenderer:
   serializedVersion: 2
@@ -911,7 +915,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &943345309
 MonoBehaviour:
   m_ObjectHideFlags: 0

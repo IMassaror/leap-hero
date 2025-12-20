@@ -17,7 +17,7 @@ public class PlayerController : MonoBehaviour
     public PlayerState currentState;
     public enum TongueState { Ready, Shooting, Pulling, Retracting }
     public TongueState currentTongueState = TongueState.Ready;
-    public enum AnimState { Idle, Walk, Jump, Fall, WallSlide, WallJump, Attack }
+    public enum AnimState { Idle, Walk, Jump, Fall, Land, WallSlide, WallJump, Attack, Dash, TongueEnd}
     private AnimState currentAnimState = AnimState.Idle;
     #endregion
 
@@ -26,18 +26,22 @@ public class PlayerController : MonoBehaviour
     private static readonly int WarriorWalk   = Animator.StringToHash("walk_h");
     private static readonly int WarriorJump   = Animator.StringToHash("jump_h");
     private static readonly int WarriorFall   = Animator.StringToHash("fall_h");
+    private static readonly int WarriorLand   = Animator.StringToHash("land_h");
     private static readonly int WarriorAttack = Animator.StringToHash("attack_h");
 
     private static readonly int FrogIdle      = Animator.StringToHash("idle_f");
     private static readonly int FrogWalk      = Animator.StringToHash("walk_f");
     private static readonly int FrogJump      = Animator.StringToHash("jump_f");
     private static readonly int FrogFall      = Animator.StringToHash("fall_f");
-    private static readonly int FrogAttack    = Animator.StringToHash("attack_f");
+    private static readonly int FrogLand      = Animator.StringToHash("land_f");
+    private static readonly int FrogAttack    = Animator.StringToHash("tongueStart_f");
     private static readonly int FrogWallSlide = Animator.StringToHash("wallslide_f");
     private static readonly int FrogWallJump  = Animator.StringToHash("walljump_f");
+    private static readonly int FrogDash    = Animator.StringToHash("dash_f");
+    private static readonly int FrogTongueEnd    = Animator.StringToHash("tongueEnd_f");
 
     private int currentAnimHash = 0;
-    private float animationLockTime = 0f; 
+    public float animationLockTime = 0f; 
     #endregion
 
     #region Inspector Variables
@@ -101,7 +105,7 @@ public class PlayerController : MonoBehaviour
     private float moveInputY;
     private bool jumpInputPressed;
     private bool isFacingRight = true;
-    private bool isAttacking = false;
+    public bool isAttacking = false;
     private float nextAttackTime;
     
     private float wallStickTimer;
@@ -114,7 +118,9 @@ public class PlayerController : MonoBehaviour
     private Vector2 currentTongueTipPos;
     private bool hasHitWall;
     public bool isGrounded;
+    public bool prevGrounded;
     public bool isTouchingWall;
+    public bool isLanding = false;
     private bool isDead = false;
     private bool canDoubleJump = false;
     #endregion
@@ -219,6 +225,7 @@ public class PlayerController : MonoBehaviour
         rb.AddForce(Vector2.up * frogJumpForce, ForceMode2D.Impulse);
         if (excalibroController != null) excalibroController.UseJump(); 
         
+        isLanding = false; 
         PlayAnimation(AnimState.WallJump); 
         currentAnimState = AnimState.WallJump; // <--- CORREÇÃO AQUI
         LockAnimation(wallJumpAnimDuration); 
@@ -235,6 +242,7 @@ public class PlayerController : MonoBehaviour
         rb.AddForce(new Vector2(jumpDirection * wallJumpForceX, wallJumpForceY), ForceMode2D.Impulse);
         if (jumpDirection == 1 && !isFacingRight) Flip(); else if (jumpDirection == -1 && isFacingRight) Flip();
 
+        isLanding = false; 
         PlayAnimation(AnimState.WallJump);
         currentAnimState = AnimState.WallJump; // <--- CORREÇÃO AQUI
         LockAnimation(wallJumpAnimDuration); 
@@ -276,7 +284,12 @@ public class PlayerController : MonoBehaviour
     #region Tongue & Utils
     void StartTongue() {
         Vector2 direction = isFacingRight ? Vector2.right : Vector2.left; currentTongueState = TongueState.Shooting;
-        if (anim != null) anim.SetTrigger("TongueShoot");
+
+        LockAnimation(1f); 
+        PlayAnimation(AnimState.Attack);
+        currentAnimState = AnimState.Attack;
+        isAttacking = true;
+
         rb.gravityScale = 0; rb.linearVelocity = Vector2.zero; tongueStartTime = Time.time;
         Vector3 realOffset = isFacingRight ? mouthOffset : new Vector3(-mouthOffset.x, mouthOffset.y, 0);
         Vector3 startPos = transform.position + realOffset; currentTongueTipPos = startPos;
@@ -291,6 +304,10 @@ public class PlayerController : MonoBehaviour
                 if (Vector2.Distance(currentTongueTipPos, tongueTargetPos) < 0.1f) currentTongueState = hasHitWall ? TongueState.Pulling : TongueState.Retracting; break;
             case TongueState.Pulling:
                 rb.linearVelocity = Vector2.zero; transform.position = Vector2.MoveTowards(transform.position, currentTongueTipPos, tonguePullSpeed * Time.deltaTime);
+
+                LockAnimation(0.1f); 
+                PlayAnimation(AnimState.Dash);
+
                 if (Vector2.Distance(transform.position, tongueTargetPos) < 0.5f) StopTongue(); break;
             case TongueState.Retracting:
                 if (rb.gravityScale == 0) rb.linearVelocity = Vector2.zero;
@@ -300,7 +317,7 @@ public class PlayerController : MonoBehaviour
                 if (Vector2.Distance(currentTongueTipPos, retractTarget) < 0.1f) StopTongue(); break;
         }
     }
-    void StopTongue() { currentTongueState = TongueState.Ready; rb.gravityScale = 4; rb.linearVelocity = Vector2.zero; nextTongueTime = Time.time + tongueCooldown; }
+    void StopTongue() { currentTongueState = TongueState.Ready; rb.gravityScale = 4; rb.linearVelocity = Vector2.zero; nextTongueTime = Time.time + tongueCooldown; LockAnimation(0.2f); PlayAnimation(AnimState.TongueEnd); currentAnimState = AnimState.TongueEnd; isAttacking = false;}
     void DrawTongue() { if (lineRenderer == null) return; if (currentTongueState != TongueState.Ready) { lineRenderer.enabled = true; lineRenderer.positionCount = 2; Vector3 realOffset = isFacingRight ? mouthOffset : new Vector3(-mouthOffset.x, mouthOffset.y, 0); lineRenderer.SetPosition(0, transform.position + realOffset); lineRenderer.SetPosition(1, currentTongueTipPos); } else lineRenderer.enabled = false; }
     void HandleInput() { if (isAttacking) moveInputX = 0; else moveInputX = Input.GetAxisRaw("Horizontal"); moveInputY = Input.GetAxisRaw("Vertical"); if (wallJumpBlockTimer > 0) wallJumpBlockTimer -= Time.deltaTime; if (currentTongueState == TongueState.Ready && Input.GetButtonDown("Jump") && !isAttacking) { if (isGrounded) jumpInputPressed = true; else if (currentState == PlayerState.Frog && isTouchingWall && !isGrounded) jumpInputPressed = true; else if (currentState == PlayerState.Frog && canDoubleJump && excalibroController != null) PerformDoubleJump(); } }
     void HandleActions() { if (currentState == PlayerState.Frog && currentTongueState == TongueState.Ready && Input.GetKeyDown(tongueKey) && Time.time > nextTongueTime) { if (moveInputX > 0 && !isFacingRight) Flip(); else if (moveInputX < 0 && isFacingRight) Flip(); StartTongue(); } if (currentState == PlayerState.Warrior && Input.GetKeyDown(attackKey) && Time.time > nextAttackTime && !isAttacking) { if (!isGrounded && moveInputY < -0.1f) StartCoroutine(PerformPogoAttack()); else StartCoroutine(PerformNormalAttack()); } if (currentTongueState == TongueState.Ready && !isTouchingWall && wallJumpBlockTimer <= 0 && !isAttacking) { if (moveInputX > 0 && !isFacingRight) Flip(); else if (moveInputX < 0 && isFacingRight) Flip(); } }
@@ -347,12 +364,22 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // 2. PRIORIDADE CHÃO (SÓ CORTA SE NÃO ESTIVER ATACANDO)
-        if (isGrounded && !isAttacking) 
+        if (isGrounded && !prevGrounded && !isLanding && rb.linearVelocity.y == 0)
         {
-            animationLockTime = 0;
+            isLanding = true;
+            LockAnimation(0.15f); 
+            PlayAnimation(AnimState.Land);
+            currentAnimState = AnimState.Land;
+            prevGrounded = true;
+            return;
         }
 
+        if (!isGrounded)
+        {
+            prevGrounded = false;
+        }
+
+        // 2. PRIORIDADE CHÃO (SÓ CORTA SE NÃO ESTIVER ATACANDO)
         // 3. Trava de tempo
         if (animationLockTime > 0)
         {
@@ -362,21 +389,36 @@ public class PlayerController : MonoBehaviour
 
         // 4. Estados normais
         AnimState newState = DetermineAnimState();
-        if (newState != currentAnimState) { PlayAnimation(newState); currentAnimState = newState; }
+        if (newState != currentAnimState && animationLockTime <= 0) { PlayAnimation(newState); currentAnimState = newState; }
     }
 
     private AnimState DetermineAnimState()
     {
-        if (currentState == PlayerState.Frog && isTouchingWall && !isGrounded && wallStickTimer > 0) return AnimState.WallSlide;
+        if (currentState == PlayerState.Frog && isTouchingWall && !isGrounded && !isLanding && wallStickTimer > 0){
+            isLanding = false; 
+            return AnimState.WallSlide;
+        }
 
         if (!isGrounded)
         {
-            if (rb.linearVelocity.y > 0.1f) return AnimState.Jump;
+            if (rb.linearVelocity.y > 0.1f){
+                isLanding = false; 
+            return AnimState.Jump; 
+            }
+
             if (rb.linearVelocity.y < -0.1f) return AnimState.Fall;
+                isLanding = false; 
             return (currentAnimState == AnimState.Jump) ? AnimState.Jump : AnimState.Fall;
         }
 
-        if (Mathf.Abs(moveInputX) > 0.1f) return AnimState.Walk;
+        if (Mathf.Abs(moveInputX) > 0.1f){
+            isLanding = false;
+            animationLockTime = 0;
+        return AnimState.Walk;
+        }  
+        else{
+            isLanding = false;
+        }
         return AnimState.Idle;
     }
 
@@ -389,6 +431,7 @@ public class PlayerController : MonoBehaviour
                 case AnimState.Walk: targetHash = WarriorWalk; break;
                 case AnimState.Jump: targetHash = WarriorJump; break;
                 case AnimState.Fall: targetHash = WarriorFall; break;
+                case AnimState.Land: targetHash = WarriorLand; break;
                 case AnimState.Attack: targetHash = WarriorAttack; break;
                 default: targetHash = WarriorIdle; break;
             }
@@ -398,9 +441,12 @@ public class PlayerController : MonoBehaviour
                 case AnimState.Walk: targetHash = FrogWalk; break;
                 case AnimState.Jump: targetHash = FrogJump; break;
                 case AnimState.Fall: targetHash = FrogFall; break;
+                case AnimState.Land: targetHash = FrogLand; break;
                 case AnimState.Attack: targetHash = FrogAttack; break;
                 case AnimState.WallSlide: targetHash = FrogWallSlide; break;
                 case AnimState.WallJump: targetHash = FrogWallJump; break; 
+                case AnimState.Dash: targetHash = FrogDash; break;
+                case AnimState.TongueEnd: targetHash = FrogTongueEnd; break;
                 default: targetHash = FrogIdle; break;
             }
         }
@@ -408,6 +454,5 @@ public class PlayerController : MonoBehaviour
     }
 
     private void LockAnimation(float duration) { animationLockTime = duration; }
-    public void UpdateAnimations(string animation, float crossfade = 0.2f, float time = 0) { if(anim != null) anim.CrossFade(animation, crossfade); }
     #endregion
 }
