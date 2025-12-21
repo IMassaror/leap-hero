@@ -1,16 +1,17 @@
 using UnityEngine;
+using ChristinaCreatesGames.Animations;
 
 public class TreeParticlesAndStretch : MonoBehaviour
 {
-    public SquashStretchController stretch;
     public ParticleSystem leafParticles;
     private PropWiggle PropWiggleR;
     private bool isWigglingB;
+    private SquashAndStretch stretch;
 
     void Start()
     {
+        stretch = GetComponent<SquashAndStretch>();
         leafParticles = GetComponentInChildren<ParticleSystem>();
-        stretch = GetComponentInChildren<SquashStretchController>();
         PropWiggleR = GetComponentInChildren<PropWiggle>();
     }
 
@@ -24,7 +25,7 @@ public class TreeParticlesAndStretch : MonoBehaviour
         if (other.CompareTag("Player") && !isWigglingB)
         {
              leafParticles.Play();
-             stretch.DoLand();
+             stretch.PlaySquashAndStretch();
         }
     }
 }

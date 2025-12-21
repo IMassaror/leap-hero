@@ -93,6 +93,10 @@ public class PlayerController : MonoBehaviour
     public float tonguePullSpeed = 18f;
     public float tongueCooldown = 0.5f;
     public Vector3 mouthOffset;
+
+    [SerializeField] private PlayerParticles particlePrefab;
+    [SerializeField] private Transform particleSpawnPoint;
+
     #endregion
 
     #region Private Variables
@@ -100,6 +104,7 @@ public class PlayerController : MonoBehaviour
     private SpriteRenderer sr;
     private BoxCollider2D boxCollider;
     private Animator anim;
+    private SquashStretchController stretch;
     
     private float moveInputX;
     private float moveInputY;
@@ -128,6 +133,7 @@ public class PlayerController : MonoBehaviour
     #region Unity Callbacks
     void Start()
     {
+        stretch = GetComponentInChildren<SquashStretchController>();
         rb = GetComponent<Rigidbody2D>();
         sr = GetComponent<SpriteRenderer>();
         boxCollider = GetComponent<BoxCollider2D>();
@@ -167,6 +173,17 @@ public class PlayerController : MonoBehaviour
         if (currentTongueState == TongueState.Pulling && ((1 << collision.gameObject.layer) & groundLayer) != 0) StopTongue();
     }
     #endregion
+
+    void SpawnParticle(string pAnim)
+    {
+        PlayerParticles p = Instantiate(
+            particlePrefab,
+            particleSpawnPoint.position,
+            Quaternion.identity
+        );
+
+        p.Play(pAnim, isFacingRight);
+    }
 
     #region Movement
     void HandleNormalMovement(float speed)
@@ -216,6 +233,8 @@ public class PlayerController : MonoBehaviour
     {
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
         rb.AddForce(Vector2.up * force, ForceMode2D.Impulse);
+        stretch.DoJump();
+        SpawnParticle("jump_dust");
     }
 
     void PerformDoubleJump()
@@ -228,14 +247,16 @@ public class PlayerController : MonoBehaviour
         isLanding = false; 
         PlayAnimation(AnimState.WallJump); 
         currentAnimState = AnimState.WallJump; // <--- CORREÇÃO AQUI
-        LockAnimation(wallJumpAnimDuration); 
+        LockAnimation(wallJumpAnimDuration);
+        stretch.DoDoubleJump(); 
+        SpawnParticle("jump_dust");
     }
 
     void PerformWallJump()
     {
         wallStickTimer = wallStickTime;
         wallJumpBlockTimer = wallJumpBlockDuration; 
-        wallDetachTimer = 0;
+        wallDetachTimer = 0; 
 
         int jumpDirection = -wallDirection;
         rb.linearVelocity = Vector2.zero;
@@ -245,7 +266,10 @@ public class PlayerController : MonoBehaviour
         isLanding = false; 
         PlayAnimation(AnimState.WallJump);
         currentAnimState = AnimState.WallJump; // <--- CORREÇÃO AQUI
-        LockAnimation(wallJumpAnimDuration); 
+        LockAnimation(wallJumpAnimDuration);
+        stretch.DoWallJump();
+        SpawnParticle("walljump_dust");
+
     }
     #endregion
 
@@ -256,6 +280,7 @@ public class PlayerController : MonoBehaviour
         
         PlayAnimation(AnimState.Attack); 
         currentAnimState = AnimState.Attack; // <--- CORREÇÃO CRÍTICA AQUI
+        stretch.DoAttack();
         
         LockAnimation(attackDuration);
         Collider2D[] hitEnemies = Physics2D.OverlapCircleAll(attackPoint.position, attackRadius, enemyLayer);
@@ -289,6 +314,7 @@ public class PlayerController : MonoBehaviour
         PlayAnimation(AnimState.Attack);
         currentAnimState = AnimState.Attack;
         isAttacking = true;
+        stretch.DoTongue();
 
         rb.gravityScale = 0; rb.linearVelocity = Vector2.zero; tongueStartTime = Time.time;
         Vector3 realOffset = isFacingRight ? mouthOffset : new Vector3(-mouthOffset.x, mouthOffset.y, 0);
@@ -307,6 +333,7 @@ public class PlayerController : MonoBehaviour
 
                 LockAnimation(0.1f); 
                 PlayAnimation(AnimState.Dash);
+                stretch.DoDash();
 
                 if (Vector2.Distance(transform.position, tongueTargetPos) < 0.5f) StopTongue(); break;
             case TongueState.Retracting:
@@ -317,7 +344,7 @@ public class PlayerController : MonoBehaviour
                 if (Vector2.Distance(currentTongueTipPos, retractTarget) < 0.1f) StopTongue(); break;
         }
     }
-    void StopTongue() { currentTongueState = TongueState.Ready; rb.gravityScale = 4; rb.linearVelocity = Vector2.zero; nextTongueTime = Time.time + tongueCooldown; LockAnimation(0.2f); PlayAnimation(AnimState.TongueEnd); currentAnimState = AnimState.TongueEnd; isAttacking = false;}
+    void StopTongue() { currentTongueState = TongueState.Ready; rb.gravityScale = 4; rb.linearVelocity = Vector2.zero; nextTongueTime = Time.time + tongueCooldown; LockAnimation(0.2f); stretch.DoTongue(); PlayAnimation(AnimState.TongueEnd); currentAnimState = AnimState.TongueEnd; isAttacking = false;}
     void DrawTongue() { if (lineRenderer == null) return; if (currentTongueState != TongueState.Ready) { lineRenderer.enabled = true; lineRenderer.positionCount = 2; Vector3 realOffset = isFacingRight ? mouthOffset : new Vector3(-mouthOffset.x, mouthOffset.y, 0); lineRenderer.SetPosition(0, transform.position + realOffset); lineRenderer.SetPosition(1, currentTongueTipPos); } else lineRenderer.enabled = false; }
     void HandleInput() { if (isAttacking) moveInputX = 0; else moveInputX = Input.GetAxisRaw("Horizontal"); moveInputY = Input.GetAxisRaw("Vertical"); if (wallJumpBlockTimer > 0) wallJumpBlockTimer -= Time.deltaTime; if (currentTongueState == TongueState.Ready && Input.GetButtonDown("Jump") && !isAttacking) { if (isGrounded) jumpInputPressed = true; else if (currentState == PlayerState.Frog && isTouchingWall && !isGrounded) jumpInputPressed = true; else if (currentState == PlayerState.Frog && canDoubleJump && excalibroController != null) PerformDoubleJump(); } }
     void HandleActions() { if (currentState == PlayerState.Frog && currentTongueState == TongueState.Ready && Input.GetKeyDown(tongueKey) && Time.time > nextTongueTime) { if (moveInputX > 0 && !isFacingRight) Flip(); else if (moveInputX < 0 && isFacingRight) Flip(); StartTongue(); } if (currentState == PlayerState.Warrior && Input.GetKeyDown(attackKey) && Time.time > nextAttackTime && !isAttacking) { if (!isGrounded && moveInputY < -0.1f) StartCoroutine(PerformPogoAttack()); else StartCoroutine(PerformNormalAttack()); } if (currentTongueState == TongueState.Ready && !isTouchingWall && wallJumpBlockTimer <= 0 && !isAttacking) { if (moveInputX > 0 && !isFacingRight) Flip(); else if (moveInputX < 0 && isFacingRight) Flip(); } }
@@ -333,15 +360,51 @@ public class PlayerController : MonoBehaviour
         bool wL = Physics2D.BoxCast(b.center, wallSize, 0f, Vector2.left, margin, groundLayer);
         if (wR) { isTouchingWall = true; wallDirection = 1; } else if (wL) { isTouchingWall = true; wallDirection = -1; } else { isTouchingWall = false; wallDirection = 0; }
         
-        if (!wasTouchingWall && isTouchingWall && currentState == PlayerState.Frog) {
+        if (!wasTouchingWall && isTouchingWall && currentState == PlayerState.Frog)
+        {
             wallStickTimer = wallStickTime;
-            wallJumpBlockTimer = 0; 
+            wallJumpBlockTimer = 0;
+
+            if (currentAnimState == AnimState.WallJump)
+            {
+                animationLockTime = 0f;
+            }
+        }
+
+        if (!wasTouchingWall && isTouchingWall && currentState == PlayerState.Frog && !isGrounded)
+        {
+            stretch.DoWallGrab();
         }
     }
 
     void HandleGroundLogic() { if (isGrounded && !canDoubleJump) { canDoubleJump = true; if (excalibroController != null && currentState == PlayerState.Frog) excalibroController.Recharge(); } }
     void Flip() { isFacingRight = !isFacingRight; Vector3 scale = transform.localScale; scale.x *= -1; transform.localScale = scale; }
-    void SwitchState(PlayerState newState) { currentState = newState; sr.color = (currentState == PlayerState.Warrior) ? warriorColor : frogColor; if (anim != null) anim.SetBool("IsSapo", currentState == PlayerState.Frog); if (excalibroController != null) { if (newState == PlayerState.Frog) excalibroController.Appear(); else excalibroController.Vanish(); } rb.gravityScale = 4; if (newState == PlayerState.Warrior) wallStickTimer = 0; }
+
+    void SwitchState(PlayerState newState) 
+    { 
+        currentState = newState; 
+        
+        if (excalibroController != null) 
+        { 
+            if (newState == PlayerState.Frog)
+            {
+                SpawnParticle("frogSwitch_particle"); 
+                excalibroController.Appear(); 
+            }
+
+            else excalibroController.Vanish(); 
+
+        } 
+
+            rb.gravityScale = 4; 
+
+        if (newState == PlayerState.Warrior) 
+        {
+            SpawnParticle("heroSwitch_particle"); 
+            wallStickTimer = 0; 
+        }
+    }
+
     public void Die() { if (isDead) return; isDead = true; rb.linearVelocity = Vector2.zero; rb.gravityScale = 1; if (anim != null) anim.SetTrigger("Die"); if (excalibroController != null) excalibroController.Vanish(); }
     void OnDrawGizmos() { if (boxCollider == null) return; Gizmos.color = Color.red; Gizmos.DrawWireCube(boxCollider.bounds.center + Vector3.down * 0.05f, boxCollider.bounds.size); if (attackPoint != null) { Gizmos.color = Color.cyan; Gizmos.DrawWireSphere(attackPoint.position, attackRadius); } if (pogoPoint != null) { Gizmos.color = Color.yellow; Gizmos.DrawWireSphere(pogoPoint.position, pogoRadius); } }
     #endregion
@@ -354,25 +417,45 @@ public class PlayerController : MonoBehaviour
     private void HandleAnimationStateMachine()
     {
         // 1. PRIORIDADE PAREDE (CORTE DE GIRO)
-        if (currentState == PlayerState.Frog && isTouchingWall && !isGrounded)
+        if (
+            currentState == PlayerState.Frog &&
+            isTouchingWall &&
+            !isGrounded &&
+            !isLanding &&
+            wallDetachTimer <= 0 &&
+            currentAnimState != AnimState.WallJump
+        )
         {
-            if (wallJumpBlockTimer <= 0)
-            {
-                animationLockTime = 0; 
-                PlayAnimation(AnimState.WallSlide); 
-                return; 
-            }
-        }
-
-        if (isGrounded && !prevGrounded && !isLanding && rb.linearVelocity.y == 0)
-        {
-            isLanding = true;
-            LockAnimation(0.15f); 
-            PlayAnimation(AnimState.Land);
-            currentAnimState = AnimState.Land;
-            prevGrounded = true;
+            animationLockTime = 0;
+            PlayAnimation(AnimState.WallSlide);
+            currentAnimState = AnimState.WallSlide;
             return;
         }
+
+        if (isGrounded && currentAnimState == AnimState.WallJump)
+        {
+            animationLockTime = 0f;
+            currentAnimState = AnimState.Idle;
+        }
+
+        if (isGrounded && !prevGrounded && rb.linearVelocity.y == 0)
+        {
+            prevGrounded = true;
+            stretch.DoLand(); 
+            SpawnParticle("land_dust");
+
+            if (Mathf.Abs(moveInputX) < 0.1f)
+            {
+                isLanding = true;
+                LockAnimation(0.15f);
+                PlayAnimation(AnimState.Land);
+                currentAnimState = AnimState.Land;
+                return;
+            }
+
+            isLanding = false;
+        }
+
 
         if (!isGrounded)
         {
@@ -394,16 +477,14 @@ public class PlayerController : MonoBehaviour
 
     private AnimState DetermineAnimState()
     {
-        if (currentState == PlayerState.Frog && isTouchingWall && !isGrounded && !isLanding && wallStickTimer > 0){
-            isLanding = false; 
-            return AnimState.WallSlide;
-        }
-
         if (!isGrounded)
         {
-            if (rb.linearVelocity.y > 0.1f){
-                isLanding = false; 
-            return AnimState.Jump; 
+            if (rb.linearVelocity.y > 0.1f && wallJumpBlockTimer <= 0)
+            {
+                isLanding = false;
+                return currentAnimState == AnimState.WallJump
+                    ? AnimState.WallJump
+                    : AnimState.Jump;
             }
 
             if (rb.linearVelocity.y < -0.1f) return AnimState.Fall;

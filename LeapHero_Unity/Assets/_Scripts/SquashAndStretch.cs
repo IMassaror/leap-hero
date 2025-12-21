@@ -11,8 +11,8 @@ namespace ChristinaCreatesGames.Animations
 
         [Header("Squash and Stretch Core")] 
         [SerializeField, Tooltip("Defaults to current GO if not set.")] private Transform transformToAffect;
-        [SerializeField] private SquashStretchAxis axisToAffect = SquashStretchAxis.Y;
-        [SerializeField, Range(0, 1f)] private float animationDuration = 0.25f;
+        [SerializeField] public SquashStretchAxis axisToAffect = SquashStretchAxis.Y;
+        [SerializeField, Range(0, 1f)] public float animationDuration = 0.25f;
         [SerializeField] private bool canBeOverwritten;
         [SerializeField] private bool playOnStart;
         [SerializeField] private bool playsEveryTime = true;
@@ -29,8 +29,8 @@ namespace ChristinaCreatesGames.Animations
         
         
         [Header("Animation Settings")] 
-        [SerializeField] private float initialScale = 1f;
-        [SerializeField] private float maximumScale = 1.3f;
+        [SerializeField] public float initialScale = 1f;
+        [SerializeField] public float maximumScale = 1.3f;
         [SerializeField] private bool resetToInitialScaleAfterAnimation = true;
         [SerializeField] private bool reverseAnimationCurveAfterPlaying;
         private bool _isReversed;
