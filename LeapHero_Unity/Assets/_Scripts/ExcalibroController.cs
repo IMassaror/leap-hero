@@ -22,22 +22,29 @@ public class ExcalibroController : MonoBehaviour
 
     [Header("Visual Feedback")]
     public Color normalColor = Color.white;
-    public Color exhaustedColor = Color.gray; // Cor quando gasta o pulo
+    public Color exhaustedColor = new Color(1, 1, 1, 0); // Cor quando gasta o pulo
     public float floatAmplitude = 0.1f;       // Altura da flutuação
     public float floatFrequency = 3f;         // Velocidade da flutuação
     #endregion
 
     #region Internal State
     private bool isActive = false;
-    private bool isExhausted = false;
+    public bool isExhausted = false;
     private Vector3 currentVelocity = Vector3.zero; // Variável auxiliar para o SmoothDamp
+    private Animator anim;
+    public bool isSpining = false;
     #endregion
 
     #region Unity Callbacks
-    void Start()
+
+    void Awake()
     {
         sr = GetComponent<SpriteRenderer>();
-        
+        anim = GetComponent<Animator>();
+    }
+
+    void Start()
+    { 
         // Tenta encontrar o player automaticamente se esqueceu de arrastar
         if (playerController == null)
             playerController = FindFirstObjectByType<PlayerController>();
@@ -68,47 +75,56 @@ public class ExcalibroController : MonoBehaviour
 
     void HandleMovement()
     {
-        Vector3 targetPosition = Vector3.zero;
+        // 🔒 PRIORIDADE MÁXIMA: girando NÃO segue o player
+        if (isSpining)
+        {
+            currentVelocity = Vector3.zero; // mata inércia
+            return;
+        }
+
+        Vector3 targetPosition;
         float currentSmoothTime = followSmoothTime;
         float playerDirection = Mathf.Sign(playerController.transform.localScale.x);
 
-        // --- Lógica de Estados da Espada ---
-
-        // 1. Estado: Sapo na Parede
+        // 1. Parede
         if (playerController.isTouchingWall && !playerController.isGrounded)
         {
-            // Fica na frente do player (para não entrar no muro)
             Vector3 frontPos = new Vector3(playerDirection * offsetWall.x, offsetWall.y, 0);
             targetPosition = playerController.transform.position + frontPos;
-            currentSmoothTime = followSmoothTime;
         }
-        // 2. Estado: No Ar e Pronta (Preparando Pulo)
+        // 2. No ar e pronta
         else if (!playerController.isGrounded && !isExhausted)
         {
-            // Vai rápido para debaixo do pé
             targetPosition = playerController.transform.position + offsetFoot;
-            currentSmoothTime = positioningSmoothTime; 
+            currentSmoothTime = positioningSmoothTime;
         }
-        // 3. Estado: No Chão ou Pulo Gasto (Idle nas Costas)
+        // 3. Idle nas costas
         else
         {
-            // Calcula flutuação suave
             float floatY = Mathf.Sin(Time.time * floatFrequency) * floatAmplitude;
-            // Inverte X (-playerDirection) para ficar nas costas
-            Vector3 backPos = new Vector3(-playerDirection * offsetBack.x, offsetBack.y + floatY, 0);
-            
+            Vector3 backPos = new Vector3(
+                -playerDirection * offsetBack.x,
+                offsetBack.y + floatY,
+                0
+            );
+
             targetPosition = playerController.transform.position + backPos;
-            currentSmoothTime = followSmoothTime;
         }
 
-        // Aplica o movimento "Manteiga" (SmoothDamp)
-        transform.position = Vector3.SmoothDamp(transform.position, targetPosition, ref currentVelocity, currentSmoothTime);
+        transform.position = Vector3.SmoothDamp(
+            transform.position,
+            targetPosition,
+            ref currentVelocity,
+            currentSmoothTime
+        );
     }
+
 
     void ApplyImpulseFeedback()
     {
         // Empurrazinho visual para baixo ao pular
-        transform.position += Vector3.down * 0.5f;
+        //transform.position += Vector3.down * 0.5f;
+        anim.Play("Spin");
     }
     #endregion
 
@@ -137,8 +153,8 @@ public class ExcalibroController : MonoBehaviour
 
     public void UseJump()
     {
-        isExhausted = true;
         ApplyImpulseFeedback();
+        isSpining = true;
     }
 
     public void Recharge()

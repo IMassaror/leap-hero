@@ -368,6 +368,8 @@ public class PlayerController : MonoBehaviour
             if (currentAnimState == AnimState.WallJump)
             {
                 animationLockTime = 0f;
+                currentAnimState = AnimState.WallSlide;
+                PlayAnimation(AnimState.WallSlide);
             }
         }
 
@@ -377,7 +379,17 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    void HandleGroundLogic() { if (isGrounded && !canDoubleJump) { canDoubleJump = true; if (excalibroController != null && currentState == PlayerState.Frog) excalibroController.Recharge(); } }
+    void HandleGroundLogic()
+    {
+        if (isGrounded && !isTouchingWall && currentTongueState == TongueState.Ready && !canDoubleJump)
+        {
+            canDoubleJump = true;
+
+            if (excalibroController != null && currentState == PlayerState.Frog)
+                excalibroController.Recharge();
+        }
+    }
+
     void Flip() { isFacingRight = !isFacingRight; Vector3 scale = transform.localScale; scale.x *= -1; transform.localScale = scale; }
 
     void SwitchState(PlayerState newState) 
