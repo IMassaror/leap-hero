@@ -4,28 +4,38 @@ public class DamageDealer : MonoBehaviour
 {
     #region Settings
     [Header("Damage Settings")]
-    public int damageAmount = 1;
-    
-    [Header("Instant Kill Options")]
-    public bool killWarriorInstantly = false; // Mata o Guerreiro na hora?
-    public bool killFrogInstantly = false;    // Mata o Sapo na hora?
+    public int damageAmount = 1; // Quantidade de dano (era 'dano')
     #endregion
 
     #region Unity Callbacks
-    private void OnTriggerEnter2D(Collider2D collision) => DealDamage(collision.gameObject);
-    private void OnCollisionEnter2D(Collision2D collision) => DealDamage(collision.gameObject);
+    
+    // Se for um Trigger (Objeto atravessável, tipo área de espinhos)
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        DealDamage(collision.gameObject);
+    }
+
+    // Se for uma Colisão Física (Objeto sólido, tipo inimigo que empurra)
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        DealDamage(collision.gameObject);
+    }
+
     #endregion
 
     #region Internal Logic
     void DealDamage(GameObject target)
     {
+        // Verifica se é o Player
         if (target.CompareTag("Player"))
         {
+            // Busca o componente NOVO (PlayerHealth) em vez do antigo (VidaPlayer)
             PlayerHealth playerHealth = target.GetComponent<PlayerHealth>();
+
             if (playerHealth != null)
             {
-                // Passamos as duas opções novas para o PlayerHealth
-                playerHealth.TakeDamage(damageAmount, killWarriorInstantly, killFrogInstantly);
+                // Chama o método NOVO (TakeDamage) em vez do antigo (TomarDano)
+                playerHealth.TakeDamage(damageAmount);
             }
         }
     }
