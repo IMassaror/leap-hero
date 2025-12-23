@@ -104,7 +104,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3e8a96e24e060d341a10f8bb9992231e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ExcalibroController
-  playerController: {fileID: 0}
+  playerController: {fileID: 9189226897272411512, guid: d77058f2dae0efa49b7b5ceac9c8deda, type: 3}
   followSmoothTime: 0.15
   positioningSmoothTime: 0.05
   offsetBack: {x: 1.8, y: 0.8, z: 0}

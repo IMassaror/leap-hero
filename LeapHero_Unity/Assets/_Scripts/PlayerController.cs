@@ -3,14 +3,6 @@ using System.Collections;
 
 public class PlayerController : MonoBehaviour
 {
-    /* =================================================================================
-     * PLAYER CONTROLLER - VERSÃO MERGE FINAL (MECÂNICAS + JUICE)
-     * =================================================================================
-     * - Mecânicas: Ground Pound, Língua Física, Wall Slide Fix, Backflip (Sua parte)
-     * - Visual: Squash&Stretch, Partículas, Animation Locking, Landing (Parte do amigo)
-     * =================================================================================
-     */
-
     #region Enums & States
     public enum PlayerState { Warrior, Frog }
     public PlayerState currentState;
@@ -18,12 +10,11 @@ public class PlayerController : MonoBehaviour
     public enum TongueState { Ready, Shooting, Pulling, Retracting }
     public TongueState currentTongueState = TongueState.Ready;
     
-    // Estados de animação expandidos (do seu amigo)
     public enum AnimState { Idle, Walk, Jump, Fall, Land, WallSlide, WallJump, Attack, Dash, TongueEnd }
     private AnimState currentAnimState = AnimState.Idle;
     #endregion
 
-    #region Animation Hashes (Otimização do Amigo)
+    #region Animation Hashes
     private static readonly int WarriorIdle   = Animator.StringToHash("idle_h");
     private static readonly int WarriorWalk   = Animator.StringToHash("walk_h");
     private static readonly int WarriorJump   = Animator.StringToHash("jump_h");
@@ -36,7 +27,7 @@ public class PlayerController : MonoBehaviour
     private static readonly int FrogJump      = Animator.StringToHash("jump_f");
     private static readonly int FrogFall      = Animator.StringToHash("fall_f");
     private static readonly int FrogLand      = Animator.StringToHash("land_f");
-    private static readonly int FrogAttack    = Animator.StringToHash("tongueStart_f"); // Ajustado para hash do amigo
+    private static readonly int FrogAttack    = Animator.StringToHash("tongueStart_f");
     private static readonly int FrogWallSlide = Animator.StringToHash("wallslide_f");
     private static readonly int FrogWallJump  = Animator.StringToHash("walljump_f");
     private static readonly int FrogDash      = Animator.StringToHash("dash_f");
@@ -49,9 +40,8 @@ public class PlayerController : MonoBehaviour
     [Header("Dependencies")]
     public ExcalibroController excalibroController;
     public LineRenderer lineRenderer;
-    public GameObject pSprite; // Referência ao Sprite separado (do amigo)
+    public GameObject pSprite; 
 
-    // JUICE DEPENDENCIES
     [Header("Visual Dependencies")]
     [SerializeField] private PlayerParticles particlePrefab;
     [SerializeField] private Transform particleSpawnPoint;
@@ -63,8 +53,6 @@ public class PlayerController : MonoBehaviour
     public float warriorSpeed = 4f;
     public float warriorJumpForce = 12f;
     public Color warriorColor = Color.white;
-    
-    [Header("Warrior - Combat")]
     public KeyCode attackKey = KeyCode.J;
     public Transform attackPoint;
     public float attackRadius = 0.8f;
@@ -73,7 +61,7 @@ public class PlayerController : MonoBehaviour
     public float attackDuration = 0.4f; 
     public float airStallDuration = 0.2f;
 
-    [Header("Warrior - Ground Pound")] // Sua mecânica
+    [Header("Warrior - Ground Pound")]
     public float groundPoundSpeed = 20f;
     public float groundPoundRadius = 0.8f;
     public Transform pogoPoint;
@@ -108,10 +96,8 @@ public class PlayerController : MonoBehaviour
     private SpriteRenderer sr;
     private BoxCollider2D boxCollider;
     private Animator anim;
-    
-    // JUICE VAR
     private SquashStretchController stretch;
-
+    
     private float moveInputX;
     private float moveInputY;
     private bool jumpInputPressed;
@@ -124,20 +110,18 @@ public class PlayerController : MonoBehaviour
     private float wallDetachTimer;
     private float nextTongueTime;
     private float tongueStartTime;
-    
     private int wallDirection = 0;
-    private bool wasTouchingWall; // Sua correção
     
     private Vector2 tongueTargetPos;
     private Vector2 currentTongueTipPos;
     private bool hasHitWall;
     
     public bool isGrounded;
+    private bool wasTouchingWall;
     public bool isTouchingWall;
     private bool isDead = false;
     private bool canDoubleJump = false;
 
-    // Variáveis de Animação Avançada (Amigo)
     private float animationLockTime = 0f;
     private bool prevGrounded;
     private bool isLanding = false;
@@ -150,12 +134,10 @@ public class PlayerController : MonoBehaviour
         sr = GetComponent<SpriteRenderer>();
         boxCollider = GetComponent<BoxCollider2D>();
         
-        // Setup do Amigo (Animator no filho + Stretch)
         if (pSprite != null) anim = pSprite.GetComponent<Animator>();
         else anim = GetComponent<Animator>();
         
         stretch = GetComponentInChildren<SquashStretchController>();
-
         if (lineRenderer != null) lineRenderer.enabled = false;
         
         SwitchState(PlayerState.Warrior);
@@ -172,7 +154,7 @@ public class PlayerController : MonoBehaviour
         HandleInput();
         HandleStateSwitch();
         HandleActions();
-        HandleAnimationStateMachine(); // Usando a máquina de estados do amigo
+        HandleAnimationStateMachine(); 
     }
 
     void FixedUpdate()
@@ -187,7 +169,6 @@ public class PlayerController : MonoBehaviour
 
         float currentSpeed = (currentState == PlayerState.Warrior) ? warriorSpeed : frogSpeed;
         
-        // Sua correção de parede mantida
         if (currentState == PlayerState.Frog && isTouchingWall && !isGrounded) HandleFrogWallLogic();
         else HandleNormalMovement(currentSpeed);
 
@@ -210,7 +191,7 @@ public class PlayerController : MonoBehaviour
     }
     #endregion
 
-    #region Visual Helpers (Juice)
+    #region Visual Helpers
     void SpawnParticle(string pAnim)
     {
         if (particlePrefab == null || particleSpawnPoint == null) return;
@@ -222,7 +203,6 @@ public class PlayerController : MonoBehaviour
     #region Input & Actions
     void HandleInput()
     {
-        // --- BACKFLIP (Sua mecânica) ---
         if (currentTongueState == TongueState.Pulling && Input.GetButtonDown("Jump"))
         {
             StopTongue();
@@ -230,11 +210,11 @@ public class PlayerController : MonoBehaviour
             float backflipY = 10f;
             rb.linearVelocity = Vector2.zero;
             rb.AddForce(new Vector2(backflipX, backflipY), ForceMode2D.Impulse);
-            GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Jump);
             
-            // Visual do amigo
             if(stretch) stretch.DoJump(); 
             SpawnParticle("jump_dust");
+            
+            PlayAnimation(AnimState.Jump);
             return;
         }
 
@@ -255,7 +235,6 @@ public class PlayerController : MonoBehaviour
 
     void HandleActions()
     {
-        // Input da Língua
         if (currentState == PlayerState.Frog && currentTongueState == TongueState.Ready && Input.GetKeyDown(tongueKey) && Time.time > nextTongueTime)
         {
             if (moveInputX > 0 && !isFacingRight) Flip();
@@ -263,10 +242,8 @@ public class PlayerController : MonoBehaviour
             StartTongue();
         }
 
-        // Input de Ataque
         if (currentState == PlayerState.Warrior && Input.GetKeyDown(attackKey) && Time.time > nextAttackTime && !isAttacking)
         {
-            // Ground Pound (Sua mecânica)
             if (!isGrounded && moveInputY < -0.1f) StartCoroutine(PerformGroundPound());
             else StartCoroutine(PerformNormalAttack());
         }
@@ -319,17 +296,14 @@ public class PlayerController : MonoBehaviour
             
             if (wallDirection == 1 && isFacingRight) Flip();
             else if (wallDirection == -1 && !isFacingRight) Flip();
-
-            if (moveInputY < 0) GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.WallSlide);
-            else GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Idle);
             
-            // Visual do amigo
+            // A cara é controlada pelo PlayAnimation
+            
             if(!isGrounded && stretch) stretch.DoWallGrab();
         } else {
             rb.gravityScale = 4;
             float slideVelocity = (moveInputY < 0) ? wallClimbSpeed : wallSlideSpeed;
             rb.linearVelocity = new Vector2(0, Mathf.Clamp(rb.linearVelocity.y, -slideVelocity, float.MaxValue));
-            if (rb.linearVelocity.y < 0) GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.WallSlide);
         }
     }
 
@@ -343,11 +317,8 @@ public class PlayerController : MonoBehaviour
     {
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
         rb.AddForce(Vector2.up * force, ForceMode2D.Impulse);
-        
-        // Efeitos
         if(stretch) stretch.DoJump();
         SpawnParticle("jump_dust");
-        if (currentState == PlayerState.Frog) GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Jump);
     }
 
     void PerformDoubleJump()
@@ -358,7 +329,6 @@ public class PlayerController : MonoBehaviour
         
         if (excalibroController != null) excalibroController.UseJump();
         
-        // Efeitos
         isLanding = false; 
         PlayAnimation(AnimState.WallJump); 
         currentAnimState = AnimState.WallJump;
@@ -381,7 +351,6 @@ public class PlayerController : MonoBehaviour
         if (jumpDirection == 1 && !isFacingRight) Flip();
         else if (jumpDirection == -1 && isFacingRight) Flip();
 
-        // Efeitos
         isLanding = false; 
         PlayAnimation(AnimState.WallJump);
         currentAnimState = AnimState.WallJump;
@@ -389,7 +358,6 @@ public class PlayerController : MonoBehaviour
         
         if(stretch) stretch.DoWallJump();
         SpawnParticle("walljump_dust");
-        GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Jump);
     }
     #endregion
 
@@ -401,7 +369,7 @@ public class PlayerController : MonoBehaviour
         
         PlayAnimation(AnimState.Attack); 
         currentAnimState = AnimState.Attack;
-        if(stretch) stretch.DoAttack(); // Juice
+        if(stretch) stretch.DoAttack();
         
         LockAnimation(attackDuration);
         Collider2D[] hitEnemies = Physics2D.OverlapCircleAll(attackPoint.position, attackRadius, enemyLayer);
@@ -411,16 +379,14 @@ public class PlayerController : MonoBehaviour
         
         rb.gravityScale = originalGravity;
         if (attackDuration > airStallDuration) yield return new WaitForSeconds(attackDuration - airStallDuration);
-        
         isAttacking = false;
     }
 
     IEnumerator PerformGroundPound()
     {
         isAttacking = true;
-        
         rb.linearVelocity = new Vector2(0, -groundPoundSpeed);
-        if (anim != null) anim.SetTrigger("AttackDown"); // Você pode criar um hash pra isso depois
+        if (anim != null) anim.SetTrigger("AttackDown"); 
 
         bool hitSomething = false;
         while (!isGrounded)
@@ -430,9 +396,8 @@ public class PlayerController : MonoBehaviour
             Collider2D[] hitObjects = Physics2D.OverlapCircleAll(checkPos, groundPoundRadius, enemyLayer | groundLayer);
             foreach (Collider2D obj in hitObjects)
             {
-                if (obj.CompareTag("Enemy")) { Destroy(obj.gameObject); hitSomething = true; }
-                if (obj.CompareTag("Breakable")) { Destroy(obj.gameObject); hitSomething = true; }
-                if (obj.CompareTag("Button")) { hitSomething = true; }
+                if (obj.CompareTag("Enemy") || obj.CompareTag("Breakable")) { Destroy(obj.gameObject); hitSomething = true; }
+                if (obj.CompareTag("Button")) hitSomething = true;
             }
             if (hitSomething) break;
             yield return null;
@@ -445,15 +410,15 @@ public class PlayerController : MonoBehaviour
     }
     #endregion
 
-    #region Tongue & Utils
+    #region Tongue
     void StartTongue() {
         Vector2 direction = isFacingRight ? Vector2.right : Vector2.left; currentTongueState = TongueState.Shooting;
 
         LockAnimation(1f); 
-        PlayAnimation(AnimState.Attack); // Usa anim de ataque como base pra lingua
+        PlayAnimation(AnimState.Attack); 
         currentAnimState = AnimState.Attack;
         isAttacking = true;
-        if(stretch) stretch.DoTongue(); // Juice
+        if(stretch) stretch.DoTongue();
 
         rb.gravityScale = 0; rb.linearVelocity = Vector2.zero; tongueStartTime = Time.time;
         Vector3 realOffset = isFacingRight ? mouthOffset : new Vector3(-mouthOffset.x, mouthOffset.y, 0);
@@ -469,9 +434,9 @@ public class PlayerController : MonoBehaviour
                 if (Vector2.Distance(currentTongueTipPos, tongueTargetPos) < 0.1f) currentTongueState = hasHitWall ? TongueState.Pulling : TongueState.Retracting; break;
             case TongueState.Pulling:
                 rb.linearVelocity = Vector2.zero; transform.position = Vector2.MoveTowards(transform.position, currentTongueTipPos, tonguePullSpeed * Time.deltaTime);
-
+                
                 LockAnimation(0.1f); 
-                PlayAnimation(AnimState.Dash); // Anim de Dash ao puxar
+                PlayAnimation(AnimState.Dash); 
                 if(stretch) stretch.DoDash();
 
                 if (Vector2.Distance(transform.position, tongueTargetPos) < 0.5f) StopTongue(); break;
@@ -483,7 +448,6 @@ public class PlayerController : MonoBehaviour
                 if (Vector2.Distance(currentTongueTipPos, retractTarget) < 0.1f) StopTongue(); break;
         }
     }
-    
     void StopTongue() { 
         currentTongueState = TongueState.Ready; 
         rb.gravityScale = 4; rb.linearVelocity = Vector2.zero; 
@@ -494,13 +458,10 @@ public class PlayerController : MonoBehaviour
         PlayAnimation(AnimState.TongueEnd); 
         currentAnimState = AnimState.TongueEnd; 
         isAttacking = false;
-        
-        GetComponent<PlayerHealth>()?.SetFrogFace(PlayerHealth.FrogFaceState.Idle);
     }
-    
     void DrawTongue() { if (lineRenderer == null) return; if (currentTongueState != TongueState.Ready) { lineRenderer.enabled = true; lineRenderer.positionCount = 2; Vector3 realOffset = isFacingRight ? mouthOffset : new Vector3(-mouthOffset.x, mouthOffset.y, 0); lineRenderer.SetPosition(0, transform.position + realOffset); lineRenderer.SetPosition(1, currentTongueTipPos); } else lineRenderer.enabled = false; }
     
-    // --- COLLISION CHECK ---
+    // Check Collisions
     void CheckCollisions() {
         bool wasTouchingWall = isTouchingWall;
         Bounds b = boxCollider.bounds; float margin = 0.08f;
@@ -510,25 +471,19 @@ public class PlayerController : MonoBehaviour
         bool wL = Physics2D.BoxCast(b.center, wallSize, 0f, Vector2.left, margin, groundLayer);
         if (wR) { isTouchingWall = true; wallDirection = 1; } else if (wL) { isTouchingWall = true; wallDirection = -1; } else { isTouchingWall = false; wallDirection = 0; }
         
-        if (!wasTouchingWall && isTouchingWall && currentState == PlayerState.Frog)
-        {
-            wallStickTimer = wallStickTime;
-            wallJumpBlockTimer = 0;
-
-            if (currentAnimState == AnimState.WallJump)
-            {
+        // --- CORREÇÃO DO BUG: SÓ GRUDA SE ESTIVER NO AR ---
+        // Se estiver no chão, não ativa o stickTimer, evitando a pose de parede
+        if (!wasTouchingWall && isTouchingWall && currentState == PlayerState.Frog && !isGrounded) 
+        { 
+            wallStickTimer = wallStickTime; 
+            wallJumpBlockTimer = 0; 
+            if (currentAnimState == AnimState.WallJump) {
                 animationLockTime = 0f;
                 currentAnimState = AnimState.WallSlide;
                 PlayAnimation(AnimState.WallSlide);
             }
         }
-        
-        // Efeito de agarrar parede (Amigo)
-        if (!wasTouchingWall && isTouchingWall && currentState == PlayerState.Frog && !isGrounded)
-        {
-            if(stretch) stretch.DoWallGrab();
-        }
-        
+        if (!wasTouchingWall && isTouchingWall && currentState == PlayerState.Frog && !isGrounded) { if(stretch) stretch.DoWallGrab(); }
         wasTouchingWall = isTouchingWall;
     }
 
@@ -537,8 +492,7 @@ public class PlayerController : MonoBehaviour
         if (isGrounded && !isTouchingWall && currentTongueState == TongueState.Ready && !canDoubleJump)
         {
             canDoubleJump = true;
-            if (excalibroController != null && currentState == PlayerState.Frog)
-                excalibroController.Recharge();
+            if (excalibroController != null && currentState == PlayerState.Frog) excalibroController.Recharge();
         }
     }
 
@@ -547,9 +501,7 @@ public class PlayerController : MonoBehaviour
     void SwitchState(PlayerState newState) 
     { 
         currentState = newState; 
-        
-        if (excalibroController != null) 
-        { 
+        if (excalibroController != null) { 
             if (newState == PlayerState.Frog) { SpawnParticle("frogSwitch_particle"); excalibroController.Appear(); }
             else excalibroController.Vanish(); 
         } 
@@ -569,15 +521,14 @@ public class PlayerController : MonoBehaviour
     void OnDrawGizmos() { if (boxCollider == null) return; Gizmos.color = Color.red; Gizmos.DrawWireCube(boxCollider.bounds.center + Vector3.down * 0.05f, boxCollider.bounds.size); if (attackPoint != null) { Gizmos.color = Color.cyan; Gizmos.DrawWireSphere(attackPoint.position, attackRadius); } if (pogoPoint != null) { Gizmos.color = Color.yellow; Gizmos.DrawWireSphere(pogoPoint.position, groundPoundRadius); } }
     #endregion
 
-    // =================================================================================
-    // MÁQUINA DE ESTADOS DO AMIGO (INTEGRADA COM SUAS MECÂNICAS)
-    // =================================================================================
     #region Animation Logic
-
     private void HandleAnimationStateMachine()
     {
         // 1. PRIORIDADE PAREDE
-        if (currentState == PlayerState.Frog && isTouchingWall && !isGrounded && !isLanding && wallDetachTimer <= 0 && currentAnimState != AnimState.WallJump)
+        // CORREÇÃO: Adicionado '&& !isGrounded' para nunca entrar em WallSlide se estiver no chão
+        bool isSticking = wallStickTimer > 0;
+
+        if (currentState == PlayerState.Frog && isTouchingWall && !isGrounded && (!isGrounded || isSticking) && !isLanding && wallDetachTimer <= 0 && currentAnimState != AnimState.WallJump)
         {
             animationLockTime = 0;
             PlayAnimation(AnimState.WallSlide);
@@ -585,14 +536,13 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        // Reset ao tocar chão
         if (isGrounded && currentAnimState == AnimState.WallJump)
         {
             animationLockTime = 0f;
             currentAnimState = AnimState.Idle;
         }
 
-        // Lógica de Landing do Amigo
+        // Landing Logic
         if (isGrounded && !prevGrounded && rb.linearVelocity.y == 0)
         {
             prevGrounded = true;
@@ -612,14 +562,14 @@ public class PlayerController : MonoBehaviour
 
         if (!isGrounded) prevGrounded = false;
 
-        // 3. Trava de tempo
+        // Trava de tempo
         if (animationLockTime > 0)
         {
             animationLockTime -= Time.deltaTime;
             return; 
         }
 
-        // 4. Estados normais
+        // Estados normais
         AnimState newState = DetermineAnimState();
         if (newState != currentAnimState && animationLockTime <= 0) { PlayAnimation(newState); currentAnimState = newState; }
     }
@@ -652,6 +602,28 @@ public class PlayerController : MonoBehaviour
     private void PlayAnimation(AnimState state)
     {
         int targetHash = 0;
+        
+        // --- ATUALIZAÇÃO SINCRONIZADA E PROTEGIDA DO DOOM FACE ---
+        if (currentState == PlayerState.Frog)
+        {
+            PlayerHealth health = GetComponent<PlayerHealth>();
+            if (health != null && !health.IsFaceLocked())
+            {
+                switch (state)
+                {
+                    case AnimState.Idle: health.SetFrogFace(PlayerHealth.FrogFaceState.Idle); break;
+                    case AnimState.Jump: health.SetFrogFace(PlayerHealth.FrogFaceState.Jump); break;
+                    case AnimState.Fall: health.SetFrogFace(PlayerHealth.FrogFaceState.Jump); break;
+                    case AnimState.WallSlide: health.SetFrogFace(PlayerHealth.FrogFaceState.WallSlide); break;
+                    case AnimState.WallJump: health.SetFrogFace(PlayerHealth.FrogFaceState.Jump); break;
+                    case AnimState.Attack: health.SetFrogFace(PlayerHealth.FrogFaceState.Tongue); break; 
+                    case AnimState.TongueEnd: health.SetFrogFace(PlayerHealth.FrogFaceState.Idle); break;
+                    default: health.SetFrogFace(PlayerHealth.FrogFaceState.Idle); break;
+                }
+            }
+        }
+        // -----------------------------------------------------------
+
         if (currentState == PlayerState.Warrior) {
             switch (state) {
                 case AnimState.Idle: targetHash = WarriorIdle; break;
