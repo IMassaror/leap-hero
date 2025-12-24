@@ -128,6 +128,7 @@ public class PlayerHealth : MonoBehaviour
             return;
 
         currentFrogFace = newState;
+        Debug.Log($"FACE -> {newState}");
         UpdateFrogUI();
     }
     #endregion

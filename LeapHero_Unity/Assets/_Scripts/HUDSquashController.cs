@@ -13,7 +13,7 @@ public class HUDSquashController : MonoBehaviour
     public void FrogHurt()
     {
         bounce.Play(
-            UIBounce.Axis.X,
+            UIBounce.Axis.Y,
             0.15f,
             1f,
             1.2f,
@@ -25,9 +25,9 @@ public class HUDSquashController : MonoBehaviour
     {
         bounce.Play(
             UIBounce.Axis.Y,
-            0.25f,
+            0.2f,
             1f,
-            1.2f,
+            1.1f,
             AnimationCurve.EaseInOut(0, 0, 1, 1)
         );
     }
@@ -48,7 +48,7 @@ public class HUDSquashController : MonoBehaviour
         bounce.Play(
             UIBounce.Axis.X,
             0.2f,
-            0.75f,
+            0.85f,
             1f,
             AnimationCurve.EaseInOut(0, 0, 1, 1)
         );
@@ -58,9 +58,9 @@ public class HUDSquashController : MonoBehaviour
     {
         bounce.Play(
             UIBounce.Axis.Y,
-            0.1f,
+            0.15f,
             1f,
-            0.7f,
+            1.4f,
             AnimationCurve.EaseInOut(0, 0, 1, 1)
         );
     }

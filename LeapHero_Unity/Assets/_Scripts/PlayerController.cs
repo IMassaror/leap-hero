@@ -10,8 +10,8 @@ public class PlayerController : MonoBehaviour
     public enum TongueState { Ready, Shooting, Pulling, Retracting }
     public TongueState currentTongueState = TongueState.Ready;
     
-    public enum AnimState { Idle, Walk, Jump, Fall, Land, WallSlide, WallJump, Attack, Dash, TongueEnd }
-    private AnimState currentAnimState = AnimState.Idle;
+    public enum AnimState { Idle, Walk, Jump, Fall, Land, WallGrab, WallSlide, WallJump, Attack, Dash, TongueEnd }
+    public AnimState currentAnimState = AnimState.Idle;
     #endregion
 
     #region Animation Hashes
@@ -28,6 +28,7 @@ public class PlayerController : MonoBehaviour
     private static readonly int FrogFall      = Animator.StringToHash("fall_f");
     private static readonly int FrogLand      = Animator.StringToHash("land_f");
     private static readonly int FrogAttack    = Animator.StringToHash("tongueStart_f");
+    private static readonly int FrogWallGrab = Animator.StringToHash("wallslide_f");
     private static readonly int FrogWallSlide = Animator.StringToHash("wallslide_f");
     private static readonly int FrogWallJump  = Animator.StringToHash("walljump_f");
     private static readonly int FrogDash      = Animator.StringToHash("dash_f");
@@ -108,7 +109,7 @@ public class PlayerController : MonoBehaviour
     public bool isAttacking = false;
     
     private float nextAttackTime;
-    private float wallStickTimer;
+    public float wallStickTimer;
     private float wallJumpBlockTimer;
     private float wallDetachTimer;
     private float nextTongueTime;
@@ -122,6 +123,7 @@ public class PlayerController : MonoBehaviour
     public bool isGrounded;
     private bool wasTouchingWall;
     public bool isTouchingWall;
+    private bool isWallSliding;
     private bool isDead = false;
     private bool canDoubleJump = false;
 
@@ -130,6 +132,7 @@ public class PlayerController : MonoBehaviour
     private bool isLanding = false;
     private bool frogHurt = false;
     private bool frogDead = false;
+    private bool frogGrab = false;
     #endregion
 
     #region Unity Callbacks
@@ -211,10 +214,16 @@ public class PlayerController : MonoBehaviour
             frogDead = true;
         }
 
+        if (health.currentFrogFace == PlayerHealth.FrogFaceState.WallSlide && !frogGrab)
+        {
+            if (fStretch) fStretch.FrogSlide();
+            frogGrab = true;
+        }
         // RESET FLAGS
         if (health.currentFrogFace == PlayerHealth.FrogFaceState.Idle)
         {
             frogHurt = false;
+            frogGrab = false;
             frogDead = false;
         }
     }
@@ -304,40 +313,66 @@ public class PlayerController : MonoBehaviour
 
     void HandleFrogWallLogic()
     {
-        if (Mathf.Abs(rb.linearVelocity.x) < 0.1f) wallJumpBlockTimer = 0;
+        isWallSliding = false;
+
+        if (Mathf.Abs(rb.linearVelocity.x) < 0.1f)
+            wallJumpBlockTimer = 0;
+
         if (wallJumpBlockTimer > 0) return;
 
         bool tryingToDetach = (moveInputX != 0 && moveInputX != wallDirection);
-        if (tryingToDetach) wallDetachTimer += Time.deltaTime; else wallDetachTimer = 0;
+        if (tryingToDetach) wallDetachTimer += Time.deltaTime;
+        else wallDetachTimer = 0;
 
-        if (tryingToDetach && wallDetachTimer > wallDetachDelay) {
+        if (tryingToDetach && wallDetachTimer > wallDetachDelay)
+        {
             rb.gravityScale = 4;
             rb.linearVelocity = new Vector2(moveInputX * frogSpeed, rb.linearVelocity.y);
             return;
         }
 
-        rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
-
-        if (wallStickTimer > 0) {
+        // -------- WALL GRAB --------
+        if (wallStickTimer > 0)
+        {
             rb.gravityScale = 0;
-            if (moveInputY < 0) rb.linearVelocity = new Vector2(0, -wallClimbSpeed); else rb.linearVelocity = Vector2.zero;
+
+            if (moveInputY < 0)
+            {
+                if (!isWallSliding)
+                {
+                    isWallSliding = true;
+                    animationLockTime = 0;
+                    PlayAnimation(AnimState.WallSlide);
+                    currentAnimState = AnimState.WallSlide;
+                }
+
+                // COMEÇOU A ESCORREGAR
+                rb.linearVelocity = new Vector2(0, -wallClimbSpeed);
+                isWallSliding = true;
+            }
+            else
+            {
+                rb.linearVelocity = Vector2.zero;
+                isWallSliding = false;
+            }
+
             wallStickTimer -= Time.deltaTime;
-            
+
             if (wallDirection == 1 && isFacingRight) Flip();
             else if (wallDirection == -1 && !isFacingRight) Flip();
-            
-            // A cara é controlada pelo PlayAnimation
-            
-            if(!isGrounded && stretch) 
-            {
-            if(fStretch) fStretch.FrogIdle();
-            stretch.DoWallGrab();
-            }
         }
-        else {
+
+        // -------- WALL SLIDE FORÇADO (stick acabou) --------
+        else
+        {
             rb.gravityScale = 4;
-            float slideVelocity = (moveInputY < 0) ? wallClimbSpeed : wallSlideSpeed;
-            rb.linearVelocity = new Vector2(0, Mathf.Clamp(rb.linearVelocity.y, -slideVelocity, float.MaxValue));
+            rb.linearVelocity = new Vector2(
+                0,
+                Mathf.Clamp(rb.linearVelocity.y, -wallSlideSpeed, float.MaxValue)
+            );
+
+            if (rb.linearVelocity.y < -0.05f)
+                isWallSliding = true;
         }
     }
 
@@ -563,15 +598,31 @@ public class PlayerController : MonoBehaviour
     #region Animation Logic
     private void HandleAnimationStateMachine()
     {
-        // 1. PRIORIDADE PAREDE
-        // CORREÇÃO: Adicionado '&& !isGrounded' para nunca entrar em WallSlide se estiver no chão
-        bool isSticking = wallStickTimer > 0;
-
-        if (currentState == PlayerState.Frog && isTouchingWall && !isGrounded && (!isGrounded || isSticking) && !isLanding && wallDetachTimer <= 0 && currentAnimState != AnimState.WallJump)
+        // WALL SLIDE (escorregando de verdade)
+        if (currentState == PlayerState.Frog &&
+            isTouchingWall &&
+            !isGrounded &&
+            isWallSliding &&
+            wallStickTimer <= 0 &&
+            currentAnimState != AnimState.WallJump)
         {
             animationLockTime = 0;
             PlayAnimation(AnimState.WallSlide);
             currentAnimState = AnimState.WallSlide;
+            return;
+        }
+
+        // WALL GRAB (grudado, parado)
+        if (currentState == PlayerState.Frog &&
+            isTouchingWall &&
+            !isGrounded &&
+            !isWallSliding &&
+            wallStickTimer > 0 &&
+            currentAnimState != AnimState.WallJump)
+        {
+            animationLockTime = 0;
+            PlayAnimation(AnimState.WallGrab);
+            currentAnimState = AnimState.WallGrab;
             return;
         }
 
@@ -618,14 +669,17 @@ public class PlayerController : MonoBehaviour
     {
         if (!isGrounded)
         {
+            // 🚫 NUNCA vira Jump se estiver na parede
+            if (isTouchingWall && currentState == PlayerState.Frog)
+                return currentAnimState;
+
             if (rb.linearVelocity.y > 0.1f && wallJumpBlockTimer <= 0)
-            {
-                isLanding = false;
-                return currentAnimState == AnimState.WallJump ? AnimState.WallJump : AnimState.Jump;
-            }
-            if (rb.linearVelocity.y < -0.1f) return AnimState.Fall;
-            isLanding = false; 
-            return (currentAnimState == AnimState.Jump) ? AnimState.Jump : AnimState.Fall;
+                return AnimState.Jump;
+
+            if (rb.linearVelocity.y < -0.1f)
+                return AnimState.Fall;
+
+            return AnimState.Fall;
         }
 
         if (Mathf.Abs(moveInputX) > 0.1f){
@@ -653,6 +707,7 @@ public class PlayerController : MonoBehaviour
                     case AnimState.Idle: health.SetFrogFace(PlayerHealth.FrogFaceState.Idle); break;
                     case AnimState.Jump: health.SetFrogFace(PlayerHealth.FrogFaceState.Jump); break;
                     case AnimState.Fall: health.SetFrogFace(PlayerHealth.FrogFaceState.Jump); break;
+                    case AnimState.WallGrab: health.SetFrogFace(PlayerHealth.FrogFaceState.Idle); break;
                     case AnimState.WallSlide: health.SetFrogFace(PlayerHealth.FrogFaceState.WallSlide); break;
                     case AnimState.WallJump: health.SetFrogFace(PlayerHealth.FrogFaceState.Jump); break;
                     case AnimState.Attack: health.SetFrogFace(PlayerHealth.FrogFaceState.Tongue); break; 
@@ -681,6 +736,7 @@ public class PlayerController : MonoBehaviour
                 case AnimState.Fall: targetHash = FrogFall; break;
                 case AnimState.Land: targetHash = FrogLand; break;
                 case AnimState.Attack: targetHash = FrogAttack; break;
+                case AnimState.WallGrab: targetHash = FrogWallGrab; break;
                 case AnimState.WallSlide: targetHash = FrogWallSlide; break;
                 case AnimState.WallJump: targetHash = FrogWallJump; break; 
                 case AnimState.Dash: targetHash = FrogDash; break;
