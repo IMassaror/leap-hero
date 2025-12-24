@@ -43,7 +43,8 @@ public class PlayerController : MonoBehaviour
     public GameObject pSprite; 
 
     [Header("Visual Dependencies")]
-    [SerializeField] private PlayerParticles particlePrefab;
+    [SerializeField] private GameObject frogFace;
+    [SerializeField] private SpriteParticles particlePrefab;
     [SerializeField] private Transform particleSpawnPoint;
 
     [Header("General Settings")]
@@ -97,6 +98,8 @@ public class PlayerController : MonoBehaviour
     private BoxCollider2D boxCollider;
     private Animator anim;
     private SquashStretchController stretch;
+    private HUDSquashController fStretch;
+    private PlayerHealth health;
     
     private float moveInputX;
     private float moveInputY;
@@ -125,11 +128,15 @@ public class PlayerController : MonoBehaviour
     private float animationLockTime = 0f;
     private bool prevGrounded;
     private bool isLanding = false;
+    private bool frogHurt = false;
+    private bool frogDead = false;
     #endregion
 
     #region Unity Callbacks
     void Start()
     {
+        health = GetComponent<PlayerHealth>();
+        fStretch = frogFace.GetComponent<HUDSquashController>();
         rb = GetComponent<Rigidbody2D>();
         sr = GetComponent<SpriteRenderer>();
         boxCollider = GetComponent<BoxCollider2D>();
@@ -150,6 +157,7 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        FaceStretch();
         if (isDead) return;
         HandleInput();
         HandleStateSwitch();
@@ -181,21 +189,41 @@ public class PlayerController : MonoBehaviour
         if (currentTongueState == TongueState.Pulling && ((1 << collision.gameObject.layer) & groundLayer) != 0) StopTongue();
     }
     
-    void OnTriggerEnter2D(Collider2D collision)
-    {
-        if (collision.CompareTag("Coin"))
-        {
-            if (CoinManager.instance != null) CoinManager.instance.AddCoins(1);
-            Destroy(collision.gameObject);
-        }
-    }
     #endregion
 
     #region Visual Helpers
+
+    void FaceStretch()
+    {
+        if (health == null) return;
+
+        // STUN
+        if (health.currentFrogFace == PlayerHealth.FrogFaceState.Stunned && !frogHurt)
+        {
+            if (fStretch) fStretch.FrogHurt();
+            frogHurt = true;
+        }
+
+        // DEAD
+        if (health.currentFrogFace == PlayerHealth.FrogFaceState.Dead && !frogDead)
+        {
+            if (fStretch) fStretch.FrogDie();
+            frogDead = true;
+        }
+
+        // RESET FLAGS
+        if (health.currentFrogFace == PlayerHealth.FrogFaceState.Idle)
+        {
+            frogHurt = false;
+            frogDead = false;
+        }
+    }
+
+
     void SpawnParticle(string pAnim)
     {
         if (particlePrefab == null || particleSpawnPoint == null) return;
-        PlayerParticles p = Instantiate(particlePrefab, particleSpawnPoint.position, Quaternion.identity);
+        SpriteParticles p = Instantiate(particlePrefab, particleSpawnPoint.position, Quaternion.identity);
         p.Play(pAnim, isFacingRight);
     }
     #endregion
@@ -211,6 +239,7 @@ public class PlayerController : MonoBehaviour
             rb.linearVelocity = Vector2.zero;
             rb.AddForce(new Vector2(backflipX, backflipY), ForceMode2D.Impulse);
             
+            if(fStretch) fStretch.FrogJump();
             if(stretch) stretch.DoJump(); 
             SpawnParticle("jump_dust");
             
@@ -299,8 +328,13 @@ public class PlayerController : MonoBehaviour
             
             // A cara é controlada pelo PlayAnimation
             
-            if(!isGrounded && stretch) stretch.DoWallGrab();
-        } else {
+            if(!isGrounded && stretch) 
+            {
+            if(fStretch) fStretch.FrogIdle();
+            stretch.DoWallGrab();
+            }
+        }
+        else {
             rb.gravityScale = 4;
             float slideVelocity = (moveInputY < 0) ? wallClimbSpeed : wallSlideSpeed;
             rb.linearVelocity = new Vector2(0, Mathf.Clamp(rb.linearVelocity.y, -slideVelocity, float.MaxValue));
@@ -318,6 +352,7 @@ public class PlayerController : MonoBehaviour
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
         rb.AddForce(Vector2.up * force, ForceMode2D.Impulse);
         if(stretch) stretch.DoJump();
+        if(fStretch) fStretch.FrogJump();
         SpawnParticle("jump_dust");
     }
 
@@ -334,7 +369,8 @@ public class PlayerController : MonoBehaviour
         currentAnimState = AnimState.WallJump;
         LockAnimation(wallJumpAnimDuration);
         
-        if(stretch) stretch.DoDoubleJump(); 
+        if(stretch) stretch.DoDoubleJump();
+        if(fStretch) fStretch.FrogJump(); 
         SpawnParticle("jump_dust");
     }
 
@@ -356,6 +392,7 @@ public class PlayerController : MonoBehaviour
         currentAnimState = AnimState.WallJump;
         LockAnimation(wallJumpAnimDuration);
         
+        if(fStretch) fStretch.FrogJump();
         if(stretch) stretch.DoWallJump();
         SpawnParticle("walljump_dust");
     }
@@ -419,6 +456,7 @@ public class PlayerController : MonoBehaviour
         currentAnimState = AnimState.Attack;
         isAttacking = true;
         if(stretch) stretch.DoTongue();
+        if(fStretch) fStretch.FrogTongue();
 
         rb.gravityScale = 0; rb.linearVelocity = Vector2.zero; tongueStartTime = Time.time;
         Vector3 realOffset = isFacingRight ? mouthOffset : new Vector3(-mouthOffset.x, mouthOffset.y, 0);
@@ -455,6 +493,7 @@ public class PlayerController : MonoBehaviour
         
         LockAnimation(0.2f); 
         if(stretch) stretch.DoTongue(); 
+        if(fStretch) fStretch.FrogIdle();
         PlayAnimation(AnimState.TongueEnd); 
         currentAnimState = AnimState.TongueEnd; 
         isAttacking = false;
@@ -547,6 +586,7 @@ public class PlayerController : MonoBehaviour
         {
             prevGrounded = true;
             if(stretch) stretch.DoLand(); 
+            if(fStretch) fStretch.FrogIdle();
             SpawnParticle("land_dust");
 
             if (Mathf.Abs(moveInputX) < 0.1f)
@@ -606,7 +646,6 @@ public class PlayerController : MonoBehaviour
         // --- ATUALIZAÇÃO SINCRONIZADA E PROTEGIDA DO DOOM FACE ---
         if (currentState == PlayerState.Frog)
         {
-            PlayerHealth health = GetComponent<PlayerHealth>();
             if (health != null && !health.IsFaceLocked())
             {
                 switch (state)

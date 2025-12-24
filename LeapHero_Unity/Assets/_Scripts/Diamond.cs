@@ -1,4 +1,5 @@
 using UnityEngine;
+using ChristinaCreatesGames.Animations;
 
 public class Diamond : MonoBehaviour
 {
@@ -18,10 +19,17 @@ public class Diamond : MonoBehaviour
     private SpriteRenderer sr;
     private Collider2D col;
 
+    private SquashAndStretch stretch;
+    [SerializeField] private SpriteParticles particlePrefab;
+    [SerializeField] private Transform particleSpawnPoint;
+    public bool isFacingRight; 
+    private bool collected;
+
     void Start()
     {
         sr = GetComponent<SpriteRenderer>();
         col = GetComponent<Collider2D>();
+        stretch = GetComponent<SquashAndStretch>();
 
         // Verifica se já pegamos esse diamante antes (Salvo no PC)
         if (PlayerPrefs.GetInt(diamondID, 0) == 1)
@@ -30,13 +38,20 @@ public class Diamond : MonoBehaviour
         }
     }
 
+    void SpawnParticle(string pAnim)
+    {
+        if (particlePrefab == null || particleSpawnPoint == null) return;
+        SpriteParticles p = Instantiate(particlePrefab, particleSpawnPoint.position, Quaternion.identity);
+        p.Play(pAnim, isFacingRight);
+    }
+
     void Update()
     {
         // Se já pegou, não faz nada
         if (isCollected || isPermamentlyCollected) return;
 
         // Lógica de Seguir
-        if (isFollowing && playerTransform != null)
+        if (isFollowing && playerTransform != null && !collected)
         {
             // O diamante flutua suavemente atrás do player
             Vector3 targetPos = playerTransform.position + new Vector3(0, 1.5f, 0);
@@ -46,9 +61,10 @@ public class Diamond : MonoBehaviour
             // Só coleta se:
             // 1. O jogador está no chão (isGrounded)
             // 2. E NÃO está tocando na parede (!isTouchingWall)
-            if (playerController.isGrounded && !playerController.isTouchingWall)
+            if (playerController.isGrounded && !playerController.isTouchingWall && !collected)
             {
-                ConfirmCollection();
+                collected = true;
+                Collected();
             }
         }
     }
@@ -62,6 +78,12 @@ public class Diamond : MonoBehaviour
             playerTransform = collision.transform;
             playerController = collision.GetComponent<PlayerController>();
         }
+    }
+
+    void Collected()
+    {
+        Invoke(nameof(ConfirmCollection), 0.25f);
+        stretch.PlaySquashAndStretch();
     }
 
     void ConfirmCollection()
@@ -82,6 +104,7 @@ public class Diamond : MonoBehaviour
         Debug.Log("Diamante " + diamondID + " coletado e SALVO!");
         
         // Some com o objeto
+        SpawnParticle("smallExplosion");
         Destroy(gameObject);
     }
 

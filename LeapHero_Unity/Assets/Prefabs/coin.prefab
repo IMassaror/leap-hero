@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 6509490376487906851}
   - component: {fileID: 1356933758052205439}
   - component: {fileID: 2312263300310073007}
+  - component: {fileID: 2627590063644497438}
   m_Layer: 0
   m_Name: coin
   m_TagString: Coin
@@ -151,6 +152,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fb89b140ca9470b46bfa21350f2a36f1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CoinPickup
+  particlePrefab: {fileID: 9157531113133585609, guid: 55b0ae498eaca5248bff909f4e4d65bd, type: 3}
+  particleSpawnPoint: {fileID: 6686048558281902028}
+  isFacingRight: 1
   value: 1
 --- !u!114 &2312263300310073007
 MonoBehaviour:
@@ -172,3 +176,62 @@ MonoBehaviour:
   - {fileID: 228860335, guid: d3eafd9c72ae96f4581b851d4734cebe, type: 3}
   - {fileID: -489135437, guid: d3eafd9c72ae96f4581b851d4734cebe, type: 3}
   frameRate: 5
+--- !u!114 &2627590063644497438
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6767596034655016135}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a17e586399063124398b06284b87a1aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChristinaCreatesGames.Animations.SquashAndStretch
+  notes: 
+  transformToAffect: {fileID: 6686048558281902028}
+  axisToAffect: 2
+  animationDuration: 0.25
+  canBeOverwritten: 0
+  playOnStart: 0
+  playsEveryTime: 1
+  chanceToPlay: 100
+  initialScale: 1
+  maximumScale: 0.7
+  resetToInitialScaleAfterAnimation: 1
+  reverseAnimationCurveAfterPlaying: 0
+  squashAndStretchCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.25
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  looping: 0
+  loopingDelay: 0.5

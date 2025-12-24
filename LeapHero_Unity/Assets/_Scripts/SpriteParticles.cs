@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class PlayerParticles : MonoBehaviour
+public class SpriteParticles : MonoBehaviour
 {
     [SerializeField] private Animator animator;
     [SerializeField] private SpriteRenderer sr;
