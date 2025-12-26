@@ -21,6 +21,8 @@ public class PlayerHealth : MonoBehaviour
     public Image[] knightHearts;
     public Sprite fullHeartSprite;
     public Sprite emptyHeartSprite;
+
+    [SerializeField] private ShieldBounce shieldBounce;
     
     [Header("Frog 'Doom' Face")]
     public Image frogFaceImage;
@@ -106,6 +108,7 @@ public class PlayerHealth : MonoBehaviour
 
         currentHealth = savedWarriorHealth;
         UpdateKnightUI();
+        shieldBounce.PlayWave();
 
         if (savedWarriorHealth <= 0) HandleDeath();
         else StartCoroutine(InvincibilityRoutine());

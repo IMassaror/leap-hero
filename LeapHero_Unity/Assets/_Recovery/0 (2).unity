@@ -320,10 +320,10 @@ Camera:
   m_LensShift: {x: 0, y: 0}
   m_NormalizedViewPortRect:
     serializedVersion: 2
-    x: 0.32723358
-    y: 0.18531469
-    width: 0.3444564
-    height: 0.6293706
+    x: -0.25
+    y: -0.18750001
+    width: 0.5
+    height: 0.37500003
   near clip plane: 0.3
   far clip plane: 1000
   field of view: 34
@@ -532,9 +532,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 941034226}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 45, y: -9}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 18, y: 18}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &787683409
@@ -575,47 +575,28 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 787683407}
   m_CullTransparentMesh: 1
---- !u!114 &787683411
-MonoBehaviour:
+--- !u!95 &787683411
+Animator:
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 787683407}
   m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 41060230de4851a4eb4457c9d9b03f95, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::UISquash.UIBounce
-  rectTransform: {fileID: 0}
-  axis: 2
-  duration: 0.1
-  initialScale: 1
-  maxScale: 1.3
-  curve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &882263662
 GameObject:
   m_ObjectHideFlags: 0
@@ -700,7 +681,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 941034226}
-  - component: {fileID: 941034228}
+  - component: {fileID: 941034227}
   m_Layer: 5
   m_Name: KnightHUD
   m_TagString: Untagged
@@ -730,7 +711,7 @@ RectTransform:
   m_AnchoredPosition: {x: 10, y: -14}
   m_SizeDelta: {x: 58, y: 18}
   m_Pivot: {x: 0, y: 1}
---- !u!114 &941034228
+--- !u!114 &941034227
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -739,16 +720,23 @@ MonoBehaviour:
   m_GameObject: {fileID: 941034225}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3a9f7e9f7055f5645a84b70283d1d548, type: 3}
+  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ShieldBounce
-  shields:
-  - {fileID: 1032501402}
-  - {fileID: 1589513900}
-  - {fileID: 787683408}
-  bounceHeight: 10
-  bounceDuration: 0.1
-  waveDelay: 0.05
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.HorizontalLayoutGroup
+  m_Padding:
+    m_Left: 0
+    m_Right: 0
+    m_Top: 0
+    m_Bottom: 0
+  m_ChildAlignment: 3
+  m_Spacing: 0
+  m_ChildForceExpandWidth: 0
+  m_ChildForceExpandHeight: 0
+  m_ChildControlWidth: 0
+  m_ChildControlHeight: 0
+  m_ChildScaleWidth: 1
+  m_ChildScaleHeight: 1
+  m_ReverseArrangement: 0
 --- !u!1001 &968412847
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -777,10 +765,6 @@ PrefabInstance:
       propertyPath: faceStunned
       value: 
       objectReference: {fileID: -5359237964062237502, guid: e19a875c42561824faaee1856f2dbfe6, type: 3}
-    - target: {fileID: 1455980674657329566, guid: d77058f2dae0efa49b7b5ceac9c8deda, type: 3}
-      propertyPath: shieldBounce
-      value: 
-      objectReference: {fileID: 941034228}
     - target: {fileID: 1455980674657329566, guid: d77058f2dae0efa49b7b5ceac9c8deda, type: 3}
       propertyPath: faceWallSlide
       value: 
@@ -1052,9 +1036,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 941034226}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 9, y: -9}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 18, y: 18}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1032501403
@@ -1095,47 +1079,28 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1032501401}
   m_CullTransparentMesh: 1
---- !u!114 &1032501405
-MonoBehaviour:
+--- !u!95 &1032501405
+Animator:
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1032501401}
   m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 41060230de4851a4eb4457c9d9b03f95, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::UISquash.UIBounce
-  rectTransform: {fileID: 0}
-  axis: 2
-  duration: 0.1
-  initialScale: 1
-  maxScale: 1.3
-  curve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &1128868128
 GameObject:
   m_ObjectHideFlags: 0
@@ -1982,9 +1947,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 941034226}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 27, y: -9}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 18, y: 18}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1589513901
@@ -2025,47 +1990,28 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1589513899}
   m_CullTransparentMesh: 1
---- !u!114 &1589513903
-MonoBehaviour:
+--- !u!95 &1589513903
+Animator:
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1589513899}
   m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 41060230de4851a4eb4457c9d9b03f95, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::UISquash.UIBounce
-  rectTransform: {fileID: 0}
-  axis: 2
-  duration: 0.1
-  initialScale: 1
-  maxScale: 1.3
-  curve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &1700059833
 GameObject:
   m_ObjectHideFlags: 0
