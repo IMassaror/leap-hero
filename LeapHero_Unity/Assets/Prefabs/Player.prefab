@@ -401,10 +401,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController
   currentState: 0
   currentTongueState: 0
-  animationLockTime: 0
+  currentAnimState: 0
   excalibroController: {fileID: 0}
   lineRenderer: {fileID: 5250277608157963151}
   pSprite: {fileID: 2573834142694952917}
+  frogFace: {fileID: 0}
+  particlePrefab: {fileID: 9157531113133585609, guid: 55b0ae498eaca5248bff909f4e4d65bd, type: 3}
+  particleSpawnPoint: {fileID: 1161531251666313399}
   groundLayer:
     serializedVersion: 2
     m_Bits: 64
@@ -420,9 +423,9 @@ MonoBehaviour:
   attackCooldown: 0.4
   attackDuration: 0.4
   airStallDuration: 0.3
-  pogoForce: 14
+  groundPoundSpeed: 20
+  groundPoundRadius: 0.8
   pogoPoint: {fileID: 7578542527117917356}
-  pogoRadius: 0.6
   frogSpeed: 7
   frogJumpForce: 15
   frogColor: {r: 0, g: 1, b: 0, a: 1}
@@ -441,13 +444,10 @@ MonoBehaviour:
   tonguePullSpeed: 18
   tongueCooldown: 0.5
   mouthOffset: {x: 0.5, y: 0.8, z: 0}
-  particlePrefab: {fileID: 9157531113133585609, guid: 55b0ae498eaca5248bff909f4e4d65bd, type: 3}
-  particleSpawnPoint: {fileID: 1161531251666313399}
   isAttacking: 0
+  wallStickTimer: 0
   isGrounded: 0
-  prevGrounded: 0
   isTouchingWall: 0
-  isLanding: 0
 --- !u!120 &5250277608157963151
 LineRenderer:
   serializedVersion: 2
@@ -569,13 +569,23 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VidaPlayer
   maxWarriorHealth: 3
-  currentHealth: 0
   restartDelay: 2
-  hearts:
+  frogRegenTime: 3
+  knightHUDObject: {fileID: 0}
+  frogHUDObject: {fileID: 0}
+  knightHearts:
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
-  fullHeart: {fileID: 1827610470, guid: 135b90e2591a6cd4593772963198476a, type: 3}
-  emptyHeart: {fileID: 293488748, guid: 135b90e2591a6cd4593772963198476a, type: 3}
-  invincibilityDuration: 1
-  spriteRenderer: {fileID: 7519388813242774466}
+  fullHeartSprite: {fileID: -1856236112382959566, guid: c045c2b1d5c8ca145b3021bc4b961edc, type: 3}
+  emptyHeartSprite: {fileID: -7295837905542136967, guid: c045c2b1d5c8ca145b3021bc4b961edc, type: 3}
+  shieldBounce: {fileID: 0}
+  frogFaceImage: {fileID: 0}
+  faceIdle: {fileID: -6729266370221590139, guid: e19a875c42561824faaee1856f2dbfe6, type: 3}
+  faceJump: {fileID: -287653484131758738, guid: e19a875c42561824faaee1856f2dbfe6, type: 3}
+  faceTongue: {fileID: 2489821860052721816, guid: e19a875c42561824faaee1856f2dbfe6, type: 3}
+  faceStunned: {fileID: -5359237964062237502, guid: e19a875c42561824faaee1856f2dbfe6, type: 3}
+  faceDead: {fileID: 7633853872010533063, guid: e19a875c42561824faaee1856f2dbfe6, type: 3}
+  faceWallSlide: {fileID: -4134950284206753589, guid: e19a875c42561824faaee1856f2dbfe6, type: 3}
+  spriteRenderer: {fileID: 1155941216062450650}
+  currentFrogFace: 0
