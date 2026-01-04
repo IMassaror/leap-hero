@@ -1,37 +1,31 @@
 using UnityEngine;
 
-public class DragAndDrop2D : MonoBehaviour
+public class DragAndDrop: MonoBehaviour
 {
+    [SerializeField] private Camera cam;
     private Vector3 offset;
-    private float zCoordinate;
 
-    // Chamado quando o botão do mouse é pressionado sobre o colisor
+    void Awake()
+    {
+        if (cam == null)
+            cam = Camera.main;
+    }
+
     void OnMouseDown()
     {
-        // Armazena a coordenada Z original do objeto
-        zCoordinate = Camera.main.WorldToScreenPoint(gameObject.transform.position).z;
+        Vector3 mousePos = Input.mousePosition;
+        mousePos.z = -cam.transform.position.z;
 
-        // Calcula o offset (deslocamento) inicial entre o centro do objeto e o ponteiro do mouse
-        offset = gameObject.transform.position - GetMouseWorldPos();
+        Vector3 worldPos = cam.ScreenToWorldPoint(mousePos);
+        offset = transform.position - worldPos;
     }
 
-    // Chamado a cada frame enquanto o botão do mouse está pressionado sobre o colisor
     void OnMouseDrag()
     {
-        // Move o objeto para a posição atual do mouse, mantendo o offset original
-        transform.position = GetMouseWorldPos() + offset;
-    }
+        Vector3 mousePos = Input.mousePosition;
+        mousePos.z = -cam.transform.position.z;
 
-    // Função auxiliar para converter a posição do mouse (pixel) para a posição do mundo (Unity world space)
-    private Vector3 GetMouseWorldPos()
-    {
-        // Posição do mouse na tela (em pixels)
-        Vector3 mousePoint = Input.mousePosition;
-        
-        // Define a coordenada Z para a distância da câmera correta
-        mousePoint.z = zCoordinate;
-        
-        // Converte a posição da tela para a posição do mundo
-        return Camera.main.ScreenToWorldPoint(mousePoint);
+        Vector3 worldPos = cam.ScreenToWorldPoint(mousePos);
+        transform.position = worldPos + offset;
     }
 }
