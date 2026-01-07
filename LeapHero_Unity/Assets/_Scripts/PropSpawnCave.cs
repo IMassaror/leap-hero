@@ -22,6 +22,9 @@ public class propTileReplacer : MonoBehaviour
     [Header("Falling Blocks")]
     public List<string> fallNames;
 
+    [Header("Falling Platforms")]
+    public List<string> fallPNames;
+
     [Header("Pivot Offset")]
     public float yOffset = -0.5f;
 
@@ -71,6 +74,13 @@ public class propTileReplacer : MonoBehaviour
                 {
                     if (obj.GetComponent<FallingBlocks>() == null)
                         obj.AddComponent<FallingBlocks>();
+                }
+
+                // SE o tile estiver marcado como "fall", adiciona o componente
+                if (fallPNames.Contains(tileName))
+                {
+                    if (obj.GetComponent<FallingPlatforms>() == null)
+                        obj.AddComponent<FallingPlatforms>();
                 }
 
                 // Remove tile original

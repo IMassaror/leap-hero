@@ -4,45 +4,41 @@ using System.Collections.Generic;
 
 public class FallingBlocks : MonoBehaviour
 {
+    [Header("Layers")]
     public LayerMask blockLayer;
 
-    private bool activated = false;
+    [Header("State")]
+    public bool activated = false;
+    public bool isInCluster = false;
 
     void Awake()
     {
         int layer = LayerMask.NameToLayer("FallingBlocks");
-
-        if (layer == -1)
-        {
-            Debug.LogError("Layer 'FallingBlocks' NÃO EXISTE!");
-            return;
-        }
-
         gameObject.layer = layer;
         blockLayer = 1 << layer;
+
+        Collider2D col = GetComponent<Collider2D>();
+        col.isTrigger = false;
     }
 
-    void OnTriggerEnter2D(Collider2D collision)
+    void OnCollisionEnter2D(Collision2D collision)
     {
-        if (activated) return;
+        // 🔒 tiles em cluster não reagem mais
+        if (isInCluster) return;
 
-        if (collision.CompareTag("Player"))
+        if (!activated && collision.gameObject.tag == "Player")
         {
             activated = true;
 
             List<FallingBlocks> group = GetConnectedTiles();
-            StartCoroutine(TriggerGroup(group));
+            StartCoroutine(CreateCluster(group));
         }
     }
 
-    // =========================
-    // CLUSTER DETECTION
-    // =========================
-
     List<FallingBlocks> GetConnectedTiles()
     {
-        List<FallingBlocks> result = new List<FallingBlocks>();
-        Queue<FallingBlocks> queue = new Queue<FallingBlocks>();
+        List<FallingBlocks> result = new();
+        Queue<FallingBlocks> queue = new();
 
         queue.Enqueue(this);
         result.Add(this);
@@ -50,18 +46,17 @@ public class FallingBlocks : MonoBehaviour
         while (queue.Count > 0)
         {
             FallingBlocks current = queue.Dequeue();
-            Collider2D col = current.GetComponent<Collider2D>();
 
-            CheckOverlap(current, Vector2.right, result, queue);
-            CheckOverlap(current, Vector2.left,  result, queue);
-            CheckOverlap(current, Vector2.up,    result, queue);
-            CheckOverlap(current, Vector2.down,  result, queue);
+            CheckNeighbor(current, Vector2.right, result, queue);
+            CheckNeighbor(current, Vector2.left,  result, queue);
+            CheckNeighbor(current, Vector2.up,    result, queue);
+            CheckNeighbor(current, Vector2.down,  result, queue);
         }
 
         return result;
     }
 
-    void CheckOverlap(
+    void CheckNeighbor(
         FallingBlocks current,
         Vector2 dir,
         List<FallingBlocks> result,
@@ -69,94 +64,85 @@ public class FallingBlocks : MonoBehaviour
     )
     {
         Collider2D col = current.GetComponent<Collider2D>();
-        Vector2 halfSize = col.bounds.extents;
+        Vector2 half = col.bounds.extents;
 
-        Vector2 offset = Vector2.zero;
+        Vector2 checkPos = (Vector2)col.bounds.center + dir * half * 2f;
 
-        if (dir == Vector2.right) offset = new Vector2(halfSize.x * 2f, 0);
-        if (dir == Vector2.left)  offset = new Vector2(-halfSize.x * 2f, 0);
-        if (dir == Vector2.up)    offset = new Vector2(0, halfSize.y * 2f);
-        if (dir == Vector2.down)  offset = new Vector2(0, -halfSize.y * 2f);
-
-        Vector2 checkPos = (Vector2)col.bounds.center + offset;
-
-        Collider2D[] hits = Physics2D.OverlapBoxAll(
+        Collider2D hit = Physics2D.OverlapBox(
             checkPos,
-            halfSize * 0.9f,
+            half * 0.9f,
             0f,
             blockLayer
         );
 
-        foreach (var hit in hits)
-        {
-            FallingBlocks tile = hit.GetComponent<FallingBlocks>();
+        if (!hit) return;
 
-            if (tile == null || result.Contains(tile))
-                continue;
+        FallingBlocks tile = hit.GetComponent<FallingBlocks>();
+        if (tile == null || result.Contains(tile)) return;
 
-            result.Add(tile);
-            queue.Enqueue(tile);
-        }
+        result.Add(tile);
+        queue.Enqueue(tile);
     }
 
-    // =========================
-    // GROUP SHAKE + FALL
-    // =========================
-
-    IEnumerator TriggerGroup(List<FallingBlocks> group)
+    IEnumerator CreateCluster(List<FallingBlocks> group)
     {
-        float shakeDuration = 0.4f;
-        float shakeStrength = 0.05f;
+        // 🔹 cria o ROOT
+        GameObject root = new("FallingBlockCluster");
+        root.transform.position = transform.position;
 
-        // Salva posições originais
-        Dictionary<FallingBlocks, Vector3> originalPositions =
-            new Dictionary<FallingBlocks, Vector3>();
+        Rigidbody2D rb = root.AddComponent<Rigidbody2D>();
+        rb.bodyType = RigidbodyType2D.Kinematic;
+        rb.freezeRotation = true;
+
+        BoxCollider2D clusterCollider = root.AddComponent<BoxCollider2D>();
+
+        // 🔹 marca tiles e reparent
+        Bounds bounds = new Bounds(transform.position, Vector3.zero);
 
         foreach (var tile in group)
-            originalPositions[tile] = tile.transform.position;
+        {
+            tile.isInCluster = true;
+            tile.activated = true;
 
+            tile.transform.SetParent(root.transform);
+            bounds.Encapsulate(tile.GetComponent<Collider2D>().bounds);
+        }
+
+        // 🔹 ajusta collider do cluster
+        clusterCollider.offset = root.transform.InverseTransformPoint(bounds.center);
+        clusterCollider.size = bounds.size;
+
+        // 🔹 TREMOR COLETIVO
+        yield return StartCoroutine(Shake(root.transform));
+
+        // 🔹 ATIVA FÍSICA
+        rb.bodyType = RigidbodyType2D.Dynamic;
+        rb.gravityScale = 3f;
+        rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+        rb.interpolation = RigidbodyInterpolation2D.Interpolate;
+    }
+
+    IEnumerator Shake(Transform root)
+    {
+        float duration = 0.75f;
+        float strength = 0.05f;
+
+        Vector3 start = root.position;
         float t = 0f;
 
-        // 🔥 TREMOR COLETIVO
-        while (t < shakeDuration)
+        while (t < duration)
         {
             t += Time.deltaTime;
 
             Vector2 offset =
-                Random.insideUnitCircle.normalized *
-                shakeStrength *
+                Random.insideUnitCircle *
+                strength *
                 Mathf.Sin(t * 50f);
 
-            foreach (var tile in group)
-                tile.transform.position = originalPositions[tile] + (Vector3)offset;
-
+            root.position = start + (Vector3)offset;
             yield return null;
         }
 
-        // Reset final
-        foreach (var tile in group)
-            tile.transform.position = originalPositions[tile];
-
-        // Pequena pausa dramática
-        yield return new WaitForSeconds(0.05f);
-
-        // 💥 QUEDA
-        foreach (var tile in group)
-            tile.Fall();
-    }
-
-    // =========================
-    // FALL
-    // =========================
-
-    public void Fall()
-    {
-        if (!TryGetComponent(out Rigidbody2D rb))
-        {
-            rb = gameObject.AddComponent<Rigidbody2D>();
-            rb.gravityScale = 3f;
-        }
-
-        Destroy(gameObject, 2f);
+        root.position = start;
     }
 }
