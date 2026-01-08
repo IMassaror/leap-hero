@@ -776,7 +776,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: fallingPlatform
+      name: falling_platform
       rect:
         serializedVersion: 2
         x: 240
@@ -793,6 +793,72 @@ TextureImporter:
       bones: []
       spriteID: 49bfbade37c3d194d82c82987066c05c
       internalID: -1501026615
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: cave_bridge1
+      rect:
+        serializedVersion: 2
+        x: 248
+        y: 0
+        width: 8
+        height: 8
+      alignment: 7
+      pivot: {x: 0.5, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 3322437e4a9b0124a9bd8c6cc98a0c27
+      internalID: -1252265291
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: cave_bridge2
+      rect:
+        serializedVersion: 2
+        x: 256
+        y: 0
+        width: 8
+        height: 8
+      alignment: 7
+      pivot: {x: 0.5, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: a0963eff85888ce478f3724ca6278a22
+      internalID: 833148539
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: cave_bridge3
+      rect:
+        serializedVersion: 2
+        x: 264
+        y: 0
+        width: 8
+        height: 8
+      alignment: 7
+      pivot: {x: 0.5, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 695a5cf5c518a7343981704f964549a7
+      internalID: -1169122980
       vertices: []
       indices: 
       edges: []
@@ -835,11 +901,14 @@ TextureImporter:
       block_T3: -1876214612
       block_TLC: -57199765
       block_TRC: 2087641101
+      cave_bridge1: -1252265291
+      cave_bridge2: 833148539
+      cave_bridge3: -1169122980
       cave_prop1: 357749872346554099
       cave_prop2: -5258563328673448698
       cave_prop3: 1064851001
       cave_prop4: 406663951
-      fallingPlatform: -1501026615
+      falling_platform: -1501026615
       spike_b: 1915187345
       spike_l: -356856313
       spike_r: -609009932
